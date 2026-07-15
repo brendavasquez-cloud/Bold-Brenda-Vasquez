@@ -1,0 +1,1933 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Brand Marketing — BOLD Colombia</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+<style>
+:root {
+  --blue: #121E6C;
+  --blue60: #3E4983;
+  --blue50: #6C759F;
+  --blue30: #BABDD3;
+  --blue10: #F1F2F6;
+  --coral: #FF2847;
+  --coral60: #F28090;
+  --coral30: #FCDFE2;
+  --coral10: #FEF5F6;
+  --white: #FFFFFF;
+  --bg: #F7F8FB;
+  --text: #121E6C;
+  --font-main: 'Montserrat', sans-serif;
+  --font-display: 'Oswald', sans-serif;
+  --radius: 16px;
+  --shadow: 0 4px 24px -4px rgba(18,30,108,0.10);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-main); background: var(--bg); color: var(--text); min-height: 100vh; }
+body { display: flex; flex-direction: column; min-height: 100vh; }
+header {
+  background: var(--white);
+  border-bottom: 1px solid var(--blue10);
+  position: sticky; top: 0; z-index: 300;
+  padding: 0 1.5rem;
+  height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.logo-area { display: flex; align-items: center; gap: 10px; }
+.logo-sub { font-size: 9px; font-weight: 700; color: var(--blue50); text-transform: uppercase; letter-spacing: 1px; margin-top: 1px; }
+.cloud-badge { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 700; color: #16a34a; background: #f0fdf4; padding: 4px 10px; border-radius: 20px; }
+.header-actions { display: flex; gap: 6px; align-items: center; }
+.sidebar-toggle {
+  display: none; background: none; border: none; cursor: pointer;
+  color: var(--blue); padding: 6px; border-radius: 8px;
+}
+.sidebar-toggle:hover { background: var(--blue10); }
+#sidebar {
+  position: fixed; top: 60px; left: 0; bottom: 0;
+  width: 220px;
+  background: var(--white);
+  border-right: 1px solid var(--blue10);
+  z-index: 200;
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  transition: transform .25s ease;
+}
+#sidebar.collapsed { transform: translateX(-220px); }
+.sidebar-inner { padding: 1rem 0.75rem; flex: 1; }
+.sidebar-section-label {
+  font-size: 9px; font-weight: 700; color: var(--blue30);
+  text-transform: uppercase; letter-spacing: 1px;
+  padding: 0 8px; margin: 16px 0 6px;
+}
+.nav-btn {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 9px 12px;
+  border-radius: 10px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; background: transparent;
+  color: var(--blue50); font-family: var(--font-main);
+  text-align: left; transition: all .15s;
+  text-transform: none; letter-spacing: 0;
+}
+.nav-btn .nav-icon { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.nav-btn .nav-label { flex: 1; }
+.nav-btn.active { background: var(--blue10); color: var(--blue); font-weight: 700; }
+.nav-btn:hover:not(.active) { background: #f7f8fb; color: var(--blue); }
+.nav-btn.connect-ai { color: var(--coral); }
+.nav-btn.connect-ai:hover { background: var(--coral10); }
+.nav-btn.sync-btn {
+  color: #0f766e; border: 1.5px solid #99f6e4; background: #f0fdfa;
+  margin-bottom: 4px;
+}
+.nav-btn.sync-btn:hover { background: #ccfbf1; }
+.nav-btn.sync-btn.syncing { color: var(--blue50); border-color: var(--blue30); background: var(--blue10); pointer-events: none; }
+.nav-btn.sync-btn.error { color: var(--coral); border-color: var(--coral30); background: var(--coral10); }
+#sidebarOverlay {
+  display: none; position: fixed; inset: 0; background: rgba(18,30,108,.35);
+  z-index: 199;
+}
+#sidebarOverlay.visible { display: block; }
+.layout-body { display: flex; flex: 1; overflow: hidden; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.fa-spin-smooth { animation: spin 1s linear infinite; display: inline-block; }
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  min-width: 0;
+}
+@media (min-width: 901px) {
+  main { margin-left: 220px; }
+}
+.view { display: none; }
+.view.active { display: block; animation: fadeUp .3s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.page-title { font-family: var(--font-display); font-size: 2rem; font-weight: 700; color: var(--blue); text-transform: uppercase; margin-bottom: 1.5rem; }
+.page-title span { color: var(--coral); }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 2rem; }
+.kpi-card {
+  background: var(--white); border-radius: var(--radius); padding: 1.25rem 1.5rem;
+  border-left: 4px solid var(--blue); box-shadow: var(--shadow);
+  display: flex; align-items: center; gap: 1rem;
+}
+.kpi-card.coral { border-left-color: var(--coral); }
+.kpi-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+.kpi-icon.blue-bg { background: var(--blue10); color: var(--blue); }
+.kpi-icon.coral-bg { background: var(--coral30); color: var(--coral); }
+.kpi-label { font-size: 10px; font-weight: 700; color: var(--blue50); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.kpi-value { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--blue); line-height: 1; }
+.kpi-value.coral { color: var(--coral); }
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 2rem; }
+.chart-card { background: var(--white); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); }
+.chart-title { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--blue); text-transform: uppercase; margin-bottom: 1rem; }
+.chart-wrap { position: relative; height: 240px; }
+.table-card { background: var(--white); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem; }
+.table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem; }
+.table-title { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; color: var(--blue); text-transform: uppercase; }
+.search-box { padding: 7px 14px; border: 1.5px solid var(--blue30); border-radius: 30px; font-size: 12px; font-family: var(--font-main); color: var(--blue); outline: none; width: 220px; }
+.search-box:focus { border-color: var(--blue); }
+.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.data-table th { background: var(--blue10); color: var(--blue); font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: .5px; padding: 10px 12px; text-align: left; }
+.data-table th:first-child { border-radius: 8px 0 0 8px; }
+.data-table th:last-child { border-radius: 0 8px 8px 0; }
+.data-table td { padding: 10px 12px; border-bottom: 1px solid var(--blue10); color: var(--text); }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--coral10); }
+.editable { cursor: pointer; border-bottom: 1px dashed var(--blue30); padding: 2px 4px; border-radius: 3px; }
+.editable:hover { background: var(--blue10); }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.badge.green { background: #f0fdf4; color: #15803d; }
+.badge.amber { background: #fffbeb; color: #b45309; }
+.badge.red { background: var(--coral30); color: var(--coral); }
+.badge.blue { background: var(--blue10); color: var(--blue); }
+.badge.gray { background: #f1f5f9; color: #64748b; }
+.btn { padding: 8px 18px; border-radius: 30px; font-size: 11px; font-weight: 700; font-family: var(--font-main); cursor: pointer; border: none; text-transform: uppercase; letter-spacing: .5px; transition: all .2s; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: var(--blue); color: var(--white); }
+.btn-primary:hover { background: var(--blue60); }
+.btn-coral { background: var(--coral); color: var(--white); }
+.btn-coral:hover { background: #c91f38; }
+.btn-outline { background: var(--white); color: var(--blue); border: 1.5px solid var(--blue30); }
+.btn-outline:hover { border-color: var(--blue); background: var(--blue10); }
+.btn-sm { padding: 5px 12px; font-size: 10px; }
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.inv-card {
+  background: var(--white); border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow); border: 1px solid var(--blue10);
+  transition: transform .2s, box-shadow .2s;
+}
+.inv-card:hover { transform: translateY(-3px); box-shadow: 0 8px 32px -4px rgba(18,30,108,.15); }
+.kit-section { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+.kit-products-panel { background: var(--white); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); }
+.kit-panel-title { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--blue); text-transform: uppercase; margin-bottom: 1rem; }
+.kit-product-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; max-height: 480px; overflow-y: auto; }
+.kit-product-item {
+  border: 2px solid var(--blue10); border-radius: 10px; padding: 10px 8px;
+  cursor: pointer; text-align: center; transition: all .2s;
+}
+.kit-product-item:hover, .kit-product-item.selected { border-color: var(--coral); background: var(--coral10); }
+.kit-product-name { font-size: 10px; font-weight: 700; color: var(--blue); text-transform: uppercase; line-height: 1.2; }
+.kit-product-stock { font-size: 9px; color: #3E4983; font-weight: 700; margin-top: 3px; }
+.kit-composer { background: var(--white); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); position: sticky; top: 88px; }
+.kit-slot { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--blue10); border-radius: 8px; margin-bottom: 6px; }
+.kit-slot-name { font-size: 11px; font-weight: 700; color: var(--blue); flex: 1; }
+.kit-slot-qty { display: flex; align-items: center; gap: 6px; }
+.kit-slot-qty button { width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--blue); color: white; cursor: pointer; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.kit-slot-qty span { font-weight: 700; font-size: 12px; min-width: 20px; text-align: center; }
+.kit-empty { text-align: center; padding: 2rem; color: var(--blue30); font-size: 12px; }
+.kit-suggestion { background: var(--coral10); border: 1px solid var(--coral30); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 11px; color: var(--blue); line-height: 1.5; }
+.kit-suggestion strong { color: var(--coral); }
+.provider-product { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+.provider-product-header {
+  padding: 16px 20px; display: flex; align-items: center; gap: 16px;
+  border-bottom: 1px solid var(--blue10); cursor: pointer;
+}
+.provider-product-name { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--blue); text-transform: uppercase; flex: 1; }
+.provider-product-body { padding: 16px 20px; display: none; }
+.provider-product-body.open { display: block; }
+.providers-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.providers-table th { background: var(--blue); color: white; padding: 8px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.providers-table td { padding: 8px 12px; border-bottom: 1px solid var(--blue10); }
+.ai-fab { position: fixed; bottom: 28px; right: 28px; z-index: 400; }
+.ai-fab-btn {
+  width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--blue); box-shadow: 0 4px 20px rgba(18,30,108,.35);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s; overflow: hidden; padding: 0;
+}
+.ai-fab-btn:hover { transform: scale(1.07); }
+.ai-panel {
+  position: fixed; bottom: 100px; right: 28px; width: 360px; z-index: 400;
+  background: var(--white); border-radius: 20px; box-shadow: 0 8px 48px -4px rgba(18,30,108,.2);
+  display: none; flex-direction: column; height: 500px; overflow: hidden;
+  animation: fadeUp .25s ease;
+}
+.ai-panel.open { display: flex; }
+.ai-panel-header {
+  background: var(--blue); color: white; padding: 14px 18px;
+  display: flex; align-items: center; gap: 10px;
+}
+.ai-panel-title { font-family: var(--font-display); font-size: .95rem; font-weight: 700; flex: 1; }
+.ai-panel-sub { font-size: 10px; opacity: .7; }
+.ai-close { background: none; border: none; color: white; cursor: pointer; font-size: 1rem; opacity: .7; }
+.ai-close:hover { opacity: 1; }
+.ai-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ai-messages::-webkit-scrollbar { width: 4px; }
+.ai-messages::-webkit-scrollbar-thumb { background: var(--blue30); border-radius: 4px; }
+.ai-msg { max-width: 85%; padding: 10px 14px; border-radius: 14px; font-size: 12px; line-height: 1.5; }
+.ai-msg.user { background: var(--coral); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+.ai-msg.ai { background: var(--blue10); color: var(--blue); align-self: flex-start; border-bottom-left-radius: 4px; white-space: pre-wrap; }
+.ai-input-row { padding: 12px; border-top: 1px solid var(--blue10); display: flex; gap: 8px; align-items: center; }
+.ai-input-row input { flex: 1; border: 1.5px solid var(--blue30); border-radius: 30px; padding: 8px 14px; font-size: 12px; font-family: var(--font-main); outline: none; }
+.ai-input-row input:focus { border-color: var(--blue); }
+.ai-input-row .send-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--blue); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(18,30,108,.7); z-index: 500; display: none; align-items: center; justify-content: center; padding: 1rem; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: white; border-radius: 20px; padding: 2rem; max-width: 440px; width: 100%; box-shadow: 0 20px 60px rgba(18,30,108,.2); position: relative; }
+.modal-icon { width: 60px; height: 60px; background: var(--coral30); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--coral); margin: 0 auto 1rem; }
+.modal-title { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; color: var(--blue); text-align: center; margin-bottom: .5rem; }
+.modal-sub { font-size: 12px; color: var(--blue50); text-align: center; margin-bottom: 1rem; }
+.modal-input { width: 100%; border: 2px solid var(--blue30); border-radius: 10px; padding: 10px 14px; font-family: monospace; font-size: 13px; outline: none; margin-bottom: 12px; }
+.modal-input:focus { border-color: var(--blue); }
+.modal-close { position: absolute; top: 14px; right: 14px; background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--blue50); }
+.filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+.filter-chip { padding: 5px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--blue30); background: white; color: var(--blue50); transition: all .15s; font-family: var(--font-main); text-transform: uppercase; }
+.filter-chip.active { background: var(--blue); color: white; border-color: var(--blue); }
+.event-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.event-card {
+  background: var(--white); border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow); border: 1px solid var(--blue10);
+  cursor: pointer; transition: transform .2s, box-shadow .2s;
+}
+.event-card:hover { transform: translateY(-3px); box-shadow: 0 8px 32px -4px rgba(18,30,108,.15); }
+.event-card-bar { height: 4px; background: linear-gradient(90deg, var(--blue) 0%, var(--coral)); }
+.event-card-body { padding: 16px; }
+.event-card-meta { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.event-card-month { font-size: 10px; font-weight: 700; color: var(--coral); background: var(--coral30); padding: 3px 10px; border-radius: 20px; text-transform: uppercase; }
+.event-card-title { font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; color: var(--blue); text-transform: uppercase; margin-bottom: 6px; line-height: 1.2; }
+.event-card-info { font-size: 11px; color: var(--blue50); margin-bottom: 12px; }
+.event-card-footer { border-top: 1px solid var(--blue10); padding-top: 12px; display: flex; justify-content: space-between; align-items: flex-end; }
+.event-card-total-label { font-size: 9px; font-weight: 700; color: var(--blue30); text-transform: uppercase; }
+.event-card-total { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; color: var(--blue); }
+.detail-section { background: white; border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem; }
+.section-label { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--blue); text-transform: uppercase; margin-bottom: 1rem; padding-bottom: 8px; border-bottom: 2px solid var(--blue10); }
+.metric-box { background: var(--blue10); border-radius: 12px; padding: 14px; }
+.metric-box.coral { border-top: 2px solid var(--coral); }
+.metric-box.blue { background: var(--blue); color: white; }
+.report-check { display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:var(--blue);font-family:var(--font-main); }
+.report-check:hover { background:var(--blue10); }
+.report-check input[type=checkbox] { width:14px;height:14px;accent-color:#121E6C;cursor:pointer;flex-shrink:0; }
+@media (max-width: 900px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .kit-section { grid-template-columns: 1fr; }
+  main { padding: 1rem; margin-left: 0 !important; }
+  #sidebar { transform: translateX(-220px); }
+  #sidebar.open { transform: translateX(0); }
+  .sidebar-toggle { display: flex !important; }
+}
+#sidebar.mini { width: 60px; }
+#sidebar.mini .nav-label,
+#sidebar.mini .sidebar-section-label,
+#sidebar.mini #collapseLabel { display: none; }
+#sidebar.mini .nav-btn { justify-content: center; padding: 10px; }
+#sidebar.mini .nav-icon { width: 24px; height: 24px; }
+#sidebar.mini #collapseIcon { transform: rotate(180deg); }
+@media (min-width: 901px) {
+  #sidebar.mini ~ main,
+  body:has(#sidebar.mini) main { margin-left: 60px; }
+}
+.nav-meta {
+  font-size: 10px; font-weight: 700; font-family: var(--font-main);
+  padding: 1px 7px; border-radius: 20px;
+  background: var(--blue10); color: var(--blue50);
+  margin-left: auto; flex-shrink: 0; white-space: nowrap;
+  transition: all .3s; min-width: 24px; text-align: center;
+}
+.nav-meta.ok    { background: #dcfce7; color: #15803d; }
+.nav-meta.warn  { background: #fef9c3; color: #854d0e; }
+.nav-meta.error { background: var(--coral30); color: var(--coral); }
+.nav-meta.sync  { background: #dbeafe; color: #1d4ed8; }
+.nav-meta.empty { opacity: 0; }
+#sidebar.mini .nav-meta { display: none; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-area">
+    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menú" style="display:none;margin-right:4px;">
+      <svg width="20" height="20" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="8" x2="28" y2="8"/><line x1="4" y1="16" x2="28" y2="16"/><line x1="4" y1="24" x2="28" y2="24"/></svg>
+    </button>
+    <div>
+      <div style="font-family:'Oswald',sans-serif;font-size:2rem;font-weight:700;letter-spacing:-1px;line-height:1;">
+        <span style="color:#121E6C;">B</span><span style="background:linear-gradient(135deg,#3E1A8E,#FF2847);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">OLD</span>
+      </div>
+      <div class="logo-sub" style="font-size:9px;letter-spacing:.8px;">Brand Marketing Colombia</div>
+    </div>
+    <div class="cloud-badge" id="cloudBadge" style="display:none;">
+      <svg width="13" height="13" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;"><path d="M24,20 A8,8 0 1,0 10,14 A6,6 0 1,0 10,26 H24"/><polyline points="12,22 16,26 24,18"/></svg> Nube activa
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="nav-btn connect-ai" onclick="openApiModal()" style="width:auto;padding:7px 14px;border-radius:30px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18,2 12,14 18,14 14,30"/></svg>
+      Conectar IA
+    </button>
+    <button class="nav-btn sync-btn" id="syncBtn" onclick="syncAllSheets()" title="Sincronizar datos desde Google Sheets" style="width:auto;padding:7px 14px;border-radius:30px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">
+      <svg width="16" height="16" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8,6 A12,12 0 0,1 26,18"/><polyline points="22,14 26,18 22,22"/><path d="M24,26 A12,12 0 0,1 6,14"/><polyline points="10,18 6,14 10,10"/></svg>
+      <span id="syncLabel">Sincronizar</span>
+    </button>
+  </div>
+</header>
+
+<div id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sidebar-inner">
+    <div class="sidebar-section-label">Navegación</div>
+
+    <button class="nav-btn active" id="navBtn-dashboard" data-view="dashboard" onclick="switchView('dashboard',this)" title="Resumen — Consolida todos los Sheets">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="30" x2="30" y2="30"/><line x1="2" y1="2" x2="2" y2="30"/><rect x="5" y="16" width="6" height="14" rx="1"/><rect x="13" y="8" width="6" height="22" rx="1"/><rect x="21" y="2" width="6" height="28" rx="1"/></svg></span>
+      <span class="nav-label">Resumen</span>
+      <span class="nav-meta" id="meta-dashboard"></span>
+    </button>
+
+    <button class="nav-btn" id="navBtn-solicitudes" data-view="solicitudes" onclick="switchView('solicitudes',this)" title="Solicitudes POP — Fulppi GID: 0">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="28" height="22" rx="4"/><polyline points="6,24 6,30 12,24"/><line x1="7" y1="9" x2="25" y2="9"/><line x1="7" y1="15" x2="20" y2="15"/></svg></span>
+      <span class="nav-label">Solicitudes</span>
+      <span class="nav-meta" id="meta-solicitudes"></span>
+    </button>
+
+    <button class="nav-btn" id="navBtn-inventario" data-view="inventario" onclick="switchView('inventario',this)" title="Inventario Fulppi GID: 1208055618 · Galería GID: 1467481724">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="14" width="18" height="16" rx="1"/><polyline points="2,14 8,6 28,6 20,14"/><polyline points="20,14 28,6 28,22 20,30"/><line x1="20" y1="14" x2="20" y2="30"/></svg></span>
+      <span class="nav-label">Inventario</span>
+      <span class="nav-meta" id="meta-inventario"></span>
+    </button>
+
+    <button class="nav-btn" id="navBtn-kits" data-view="kits" onclick="switchView('kits',this)" title="Constructor de Kits">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="12" width="28" height="18" rx="3"/><path d="M10,12 L10,6 Q10,2 16,2 Q22,2 22,6 L22,12"/><line x1="2" y1="20" x2="30" y2="20"/><rect x="13" y="17" width="6" height="6" rx="1.5"/></svg></span>
+      <span class="nav-label">Kits</span>
+      <span class="nav-meta" id="meta-kits"></span>
+    </button>
+
+    <button class="nav-btn" id="navBtn-proveedores" data-view="proveedores" onclick="switchView('proveedores',this)" title="Comparativo Proveedores">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="8" width="18" height="18" rx="2"/><polyline points="19,10 19,26 29,26 29,16 24,8 19,8"/><polyline points="19,14 26,14"/></svg></span>
+      <span class="nav-label">Proveedores</span>
+      <span class="nav-meta" id="meta-proveedores"></span>
+    </button>
+
+    <button class="nav-btn" id="navBtn-eventos" data-view="eventos" onclick="switchView('eventos',this)" title="Eventos TMK 2026">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="28" height="26" rx="3"/><line x1="2" y1="12" x2="30" y2="12"/><line x1="10" y1="2" x2="10" y2="8"/><line x1="22" y1="2" x2="22" y2="8"/><rect x="7" y="17" width="5" height="5" rx="1"/><rect x="14" y="17" width="5" height="5" rx="1"/><rect x="21" y="17" width="5" height="5" rx="1"/></svg></span>
+      <span class="nav-label">Eventos</span>
+      <span class="nav-meta" id="meta-eventos"></span>
+    </button>
+
+    <button class="nav-btn" id="navBtn-objetivos" data-view="objetivos" onclick="switchView('objetivos',this)" title="Objetivos TMK Trade — GID: 1726665658">
+      <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="14"/><circle cx="16" cy="16" r="8"/><circle cx="16" cy="16" r="3"/></svg></span>
+      <span class="nav-label">Objetivos</span>
+      <span class="nav-meta" id="meta-objetivos"></span>
+    </button>
+
+    <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--blue10);">
+      <button onclick="toggleSidebarDesktop()" id="sidebarCollapseBtn"
+        style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;border-radius:10px;font-size:11px;font-weight:700;color:var(--blue50);background:none;border:none;cursor:pointer;font-family:var(--font-main);text-transform:uppercase;letter-spacing:.5px;">
+        <svg id="collapseIcon" width="16" height="16" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 10,16 20,26"/></svg>
+        <span id="collapseLabel">Volver</span>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<main>
+<!-- DASHBOARD VIEW -->
+<div id="view-dashboard" class="view active">
+  <div id="syncBanner" style="display:none;margin-bottom:1rem;padding:10px 16px;border-radius:10px;font-size:12px;font-weight:700;align-items:center;gap:8px;"></div>
+  <!-- Panel de fuentes de datos -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.2rem;">
+    <a href="https://docs.google.com/spreadsheets/d/1apEEKUUc7t5ckbVOvdLEbOnhxz0dtNyql33Ko5wIcVs/edit" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue50);background:var(--blue10);padding:3px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">📊 Fulppi POP</a>
+    <a href="https://docs.google.com/spreadsheets/d/1r2qVtowtcZg1g80KMMABc1rOx1cMmjXjY0nJee_iVBc/edit?gid=1961082464" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue50);background:var(--blue10);padding:3px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">📊 Eventos TMK</a>
+    <a href="https://docs.google.com/spreadsheets/d/1r2qVtowtcZg1g80KMMABc1rOx1cMmjXjY0nJee_iVBc/edit?gid=1726665658" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue50);background:var(--blue10);padding:3px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">📊 Objetivos TMK</a>
+    <a href="https://docs.google.com/spreadsheets/d/1DqcdQdxliNzuHs3_b3mJrUUJ4w1l5uLyHXZII6Nu6HQ/edit?gid=116112180" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue50);background:var(--blue10);padding:3px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">📊 Kits</a>
+    <a href="https://docs.google.com/spreadsheets/d/1Rn0uy6WtBu1sEnNMLZeGu9dJtlYkzwQd/edit?gid=1688060218" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue50);background:var(--blue10);padding:3px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">📊 Proveedores</a>
+    <a href="https://drive.google.com/drive/folders/1sC8YzmLu5KVoRh_VOg_fDJhTH0yEw0AR" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue50);background:var(--blue10);padding:3px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">📁 Drive POP</a>
+    <a href="https://drive.google.com/drive/folders/1MAloVfJqdGlw1Xe36PgNWK7oTH4IEyzY" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue50);background:var(--blue10);padding:3px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">📁 Drive Eventos</a>
+    <a href="https://drive.google.com/drive/folders/1imO3FKNNDovRz5QYET7e9QZlhanx9MDb" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue50);background:var(--blue10);padding:3px 10px;border-radius:20px;text-decoration:none;white-space:nowrap;">📁 Drive Activaciones</a>
+  </div>
+  <div class="page-title" style="background:linear-gradient(90deg,#121E6C 0%,#8A2F6E 50%,#FF2847 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Resumen General 2026</div>
+  <div class="kpi-grid" id="kpiGrid"></div>
+  <div class="charts-grid">
+    <div class="chart-card"><div class="chart-title">Solicitudes por Mes</div><div class="chart-wrap"><canvas id="chartMonth"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Distribución por Estado</div><div class="chart-wrap"><canvas id="chartStatus"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Top Artículos Solicitados</div><div class="chart-wrap"><canvas id="chartItems"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Inversión por Mes — Eventos 2026 (Sin IVA)</div><div class="chart-wrap"><canvas id="chartEventosMes"></canvas></div></div>
+  </div>
+</div>
+
+<!-- SOLICITUDES VIEW -->
+<div id="view-solicitudes" class="view">
+  <div class="page-title">Solicitudes <span>Branding</span></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+    <a href="https://docs.google.com/spreadsheets/d/1apEEKUUc7t5ckbVOvdLEbOnhxz0dtNyql33Ko5wIcVs/edit?gid=0" target="_blank" style="font-size:11px;font-weight:700;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;padding:4px 12px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+      <svg width="11" height="11" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H28V14"/><line x1="28" y1="4" x2="14" y2="18"/><path d="M22 10H8Q4 10 4 14V24Q4 28 8 28H20Q24 28 24 24V18"/></svg>
+      Fulppi · Hoja Solicitudes
+    </a>
+  </div>
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">Solicitudes Branding — POP 2026</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input class="search-box" id="searchSolicitudes" placeholder="🔍 Buscar solicitud..." oninput="filterSolicitudes()">
+        <div style="position:relative;" id="reportDropdownWrap">
+          <button class="btn btn-outline btn-sm" onclick="toggleReportMenu()">Informe ▾</button>
+          <div id="reportMenu" style="display:none;position:absolute;right:0;top:110%;background:white;border:1.5px solid var(--blue10);border-radius:12px;box-shadow:0 8px 24px rgba(18,30,108,.14);z-index:200;min-width:230px;padding:10px;">
+            <div style="font-size:10px;font-weight:700;color:var(--blue50);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Selecciona secciones</div>
+            <label class="report-check"><input type="checkbox" value="all" onchange="reportCheckAll(this)"> <span>✅ Todos los registros</span></label>
+            <label class="report-check"><input type="checkbox" value="ENTREGADO"> <span>✓ Entregados</span></label>
+            <label class="report-check"><input type="checkbox" value="NO ENTREGADO"> <span>✕ No entregados</span></label>
+            <label class="report-check"><input type="checkbox" value="PENDIENTE ALISTAMIENTO"> <span>📦 Pendiente alistamiento</span></label>
+            <label class="report-check"><input type="checkbox" value="vista"> <span>👁 Vista actual</span></label>
+            <div style="border-top:1px solid var(--blue10);margin:8px 0 6px;"></div>
+            <button onclick="exportInforme()" style="width:100%;background:#121E6C;color:white;border:none;border-radius:8px;padding:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font-main);">⬇ Descargar CSV</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openNewSolicitud()">+ Nueva</button>
+      </div>
+    </div>
+    <div class="filter-row" id="solicitudFilter">
+      <button class="filter-chip active" onclick="filterByEstado('all',this)">Todos</button>
+      <button class="filter-chip" onclick="filterByEstado('ENTREGADO',this)">Entregado</button>
+      <button class="filter-chip" onclick="filterByEstado('DISTRIBUCIÓN',this)">Distribución</button>
+      <button class="filter-chip" onclick="filterByEstado('TRANSITO NACIONAL',this)">Tránsito</button>
+      <button class="filter-chip" onclick="filterByEstado('PENDIENTE ALISTAMIENTO',this)">Alistamiento</button>
+      <button class="filter-chip" onclick="filterByEstado('POR PROGRAMAR',this)">Por programar</button>
+      <button class="filter-chip" onclick="filterByEstado('CANCELADO',this)">Cancelado</button>
+      <button class="filter-chip" onclick="filterByEstado('NO ENTREGADO',this)">No entregado</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" id="solicitudesTable">
+        <thead><tr><th>No.</th><th>Fecha</th><th>C.Costo</th><th>Solicita</th><th>Destinatario</th><th>Ciudad</th><th>Artículo</th><th>Cant.</th><th>Orden</th><th>Estado</th><th>Mes</th></tr></thead>
+        <tbody id="solicitudesBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- INVENTARIO VIEW -->
+<div id="view-inventario" class="view">
+  <div class="page-title">Inventario <span>Fulppi</span></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <a href="https://docs.google.com/spreadsheets/d/1apEEKUUc7t5ckbVOvdLEbOnhxz0dtNyql33Ko5wIcVs/edit?gid=1208055618" target="_blank" style="font-size:11px;font-weight:700;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;padding:4px 12px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+      <svg width="11" height="11" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H28V14"/><line x1="28" y1="4" x2="14" y2="18"/><path d="M22 10H8Q4 10 4 14V24Q4 28 8 28H20Q24 28 24 24V18"/></svg>
+      Fulppi · Inventario
+    </a>
+    <a href="https://docs.google.com/spreadsheets/d/1apEEKUUc7t5ckbVOvdLEbOnhxz0dtNyql33Ko5wIcVs/edit?gid=1467481724" target="_blank" style="font-size:11px;font-weight:700;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;padding:4px 12px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+      <svg width="11" height="11" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H28V14"/><line x1="28" y1="4" x2="14" y2="18"/><path d="M22 10H8Q4 10 4 14V24Q4 28 8 28H20Q24 28 24 24V18"/></svg>
+      Galería Fotos
+    </a>
+  </div>
+  <div class="filter-row">
+    <input class="search-box" id="searchInv" placeholder="🔍 Buscar producto..." oninput="filterInventory()" style="width:220px;">
+    <button class="filter-chip active" onclick="filterInvStatus('all',this)">Todos</button>
+    <button class="filter-chip" onclick="filterInvStatus('ok',this)">Disponible</button>
+    <button class="filter-chip" onclick="filterInvStatus('low',this)">Stock Bajo</button>
+    <button class="filter-chip" onclick="filterInvStatus('zero',this)">Agotado</button>
+    <button id="btnRefreshFotos" class="btn btn-outline btn-sm" onclick="refreshFotos()" title="Recargar fotos desde Google Sheets" style="display:inline-flex;align-items:center;gap:5px;color:#0f766e;border-color:#99f6e4;background:#f0fdfa;">
+      <svg width="13" height="13" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8,6 A12,12 0 0,1 26,18"/><polyline points="22,14 26,18 22,22"/><path d="M24,26 A12,12 0 0,1 6,14"/><polyline points="10,18 6,14 10,10"/></svg> Fotos
+    </button>
+    <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="openNewProduct()">+ Producto</button>
+  </div>
+  <div class="inv-grid" id="inventoryGrid"></div>
+</div>
+
+<!-- KITS VIEW -->
+<div id="view-kits" class="view">
+  <div class="page-title">Constructor <span>de Kits</span></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <a href="https://docs.google.com/spreadsheets/d/1DqcdQdxliNzuHs3_b3mJrUUJ4w1l5uLyHXZII6Nu6HQ/edit?gid=116112180" target="_blank" style="font-size:11px;font-weight:700;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;padding:4px 12px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+      <svg width="11" height="11" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H28V14"/><line x1="28" y1="4" x2="14" y2="18"/><path d="M22 10H8Q4 10 4 14V24Q4 28 8 28H20Q24 28 24 24V18"/></svg>
+      Kits Guardados · Sheet
+    </a>
+    <span style="font-size:10px;color:var(--blue50);">Los kits guardados se registran en esta hoja de Google Sheets</span>
+  </div>
+  <div class="kit-section">
+    <div class="kit-products-panel">
+      <div class="kit-panel-title">Productos Disponibles en Bodega</div>
+      <p style="font-size:12px;color:var(--blue50);margin-bottom:1rem;">Selecciona los productos para armar el kit.</p>
+      <div class="kit-product-list" id="kitProductsList"></div>
+    </div>
+    <div class="kit-composer">
+      <div class="kit-panel-title">Kit Activo</div>
+      <div class="kit-suggestion" id="kitSuggestion"><strong>💡 Sugerencia IA:</strong> Selecciona productos para recibir una recomendación.</div>
+      <div id="kitItems"></div>
+      <div style="margin-top:12px;">
+        <div style="margin-bottom:8px;">
+          <label style="font-size:11px;font-weight:700;color:var(--blue);">NOMBRE DEL KIT</label>
+          <input id="kitName" type="text" placeholder="Ej: Kit Evento Medellín..." style="width:100%;border:1.5px solid var(--blue30);border-radius:8px;padding:7px 10px;font-size:12px;margin-top:4px;font-family:var(--font-main);outline:none;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px;font-weight:700;color:var(--blue);">EVENTO ASOCIADO</label>
+          <select id="kitEvent" style="width:100%;border:1.5px solid var(--blue30);border-radius:8px;padding:7px 10px;font-size:12px;margin-top:4px;font-family:var(--font-main);outline:none;background:white;"><option value="">Seleccionar evento...</option></select>
+        </div>
+        <button class="btn btn-coral" style="width:100%;" onclick="saveKit()">💾 Guardar Kit</button>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:2rem;">
+    <div class="table-title" style="margin-bottom:1rem;font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--blue);text-transform:uppercase;">Kits Guardados</div>
+    <div id="savedKitsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
+  </div>
+</div>
+
+<!-- PROVEEDORES VIEW -->
+<div id="view-proveedores" class="view">
+  <div class="page-title">Comparativo <span>de Proveedores</span></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <a href="https://docs.google.com/spreadsheets/d/1Rn0uy6WtBu1sEnNMLZeGu9dJtlYkzwQd/edit?gid=1688060218" target="_blank" style="font-size:11px;font-weight:700;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;padding:4px 12px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">
+      <svg width="11" height="11" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H28V14"/><line x1="28" y1="4" x2="14" y2="18"/><path d="M22 10H8Q4 10 4 14V24Q4 28 8 28H20Q24 28 24 24V18"/></svg>
+      Comparativo Proveedores · Sheet
+    </a>
+  </div>
+  <div class="filter-row">
+    <input class="search-box" id="searchProv" placeholder="🔍 Buscar producto..." oninput="filterProveedores()" style="width:220px;">
+    <button class="filter-chip active" onclick="filterProvStatus('all',this)">Todos</button>
+    <button class="filter-chip" onclick="filterProvStatus('SELECCIONADO',this)">Seleccionado</button>
+    <button class="filter-chip" onclick="filterProvStatus('RECHAZADO',this)">Rechazado</button>
+    <button class="filter-chip" onclick="filterProvStatus('PENDIENTE',this)">Pendiente</button>
+  </div>
+  <div id="proveedoresContainer"></div>
+</div>
+
+<!-- OBJETIVOS VIEW -->
+<div id="view-objetivos" class="view">
+  <div class="page-title">Objetivos <span>TMK Trade</span></div>
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">Objetivos TMK — Sincronizado desde Google Sheets</div>
+      <div style="display:flex;gap:6px;">
+        <a href="https://docs.google.com/spreadsheets/d/1r2qVtowtcZg1g80KMMABc1rOx1cMmjXjY0nJee_iVBc/edit?gid=1726665658" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#0f766e;border-color:#99f6e4;background:#f0fdfa;">
+          ↗ Abrir Sheet
+        </a>
+        <button class="btn btn-outline btn-sm" onclick="syncAllSheets(false)">↺ Actualizar</button>
+      </div>
+    </div>
+    <div id="objetivosContent" style="overflow-x:auto;"><p style="color:var(--blue50);font-size:13px;padding:1rem 0;">Cargando objetivos desde Google Sheets...</p></div>
+  </div>
+</div>
+
+<!-- EVENTOS VIEW -->
+<div id="view-eventos" class="view">
+  <div class="page-title">Gestión de <span>Eventos</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px;">
+    <div class="filter-row" style="margin-bottom:0;flex-wrap:wrap;gap:8px;">
+      <button class="filter-chip active" onclick="filterEventos('all',this)">Todos</button>
+      <button class="filter-chip" onclick="filterEventos('Realizado',this)">Realizados</button>
+      <button class="filter-chip" onclick="filterEventos('Pendiente',this)">Pendientes</button>
+      <button onclick="openOCModal('pop')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#FF2847 0%,#c91f38 100%);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;border:none;">
+        📦 Total POP sin IVA | $192.551.985
+      </button>
+      <button onclick="openOCModal('activaciones')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1a2878 0%,#FF2847 160%);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;border:none;">
+        ⚡ Total Activaciones sin IVA | $64.898.531
+      </button>
+      <button onclick="openOCModal('patrocinios')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1e7c4a 0%,#145c35 100%);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;border:none;">
+        ⭐ Total Patrocinios sin IVA | $120.000.000
+      </button>
+      <button onclick="openOCModal('envios')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#5c4fa0 0%,#3a2f7a 100%);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;border:none;">
+        🚚 Total Envíos sin IVA | $5.158.208
+      </button>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <a href="https://docs.google.com/spreadsheets/d/1r2qVtowtcZg1g80KMMABc1rOx1cMmjXjY0nJee_iVBc/edit?gid=1961082464" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#0f766e;border-color:#99f6e4;background:#f0fdfa;">↗ Sheet Eventos</a>
+      <a href="https://drive.google.com/drive/folders/1MAloVfJqdGlw1Xe36PgNWK7oTH4IEyzY" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#5c4fa0;border-color:#c4b5fd;background:#f5f3ff;">📁 Fotos Eventos</a>
+      <button class="btn btn-outline btn-sm" onclick="exportCSVEventos()">⬇ CSV</button>
+      <button class="btn btn-coral btn-sm" onclick="addEvento()">+ Nuevo Evento</button>
+    </div>
+  </div>
+  <div id="eventosGrid" class="event-cards"></div>
+  <div id="eventoDetail" style="display:none;"></div>
+</div>
+</main>
+
+<!-- AI FAB -->
+<div class="ai-fab">
+  <div class="ai-panel" id="aiPanel">
+    <div class="ai-panel-header">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--coral);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🤖</div>
+      <div>
+        <div class="ai-panel-title">Bold AI · Asistente Corporativo</div>
+        <div class="ai-panel-sub">Impulsado por Claude · Aprende de tu contexto</div>
+      </div>
+      <button class="ai-close" onclick="toggleAI()" style="font-size:1.4rem;font-weight:300;line-height:1;">—</button>
+    </div>
+    <div class="ai-messages" id="aiMessages">
+      <div class="ai-msg ai">¡Bienvenido al asistente corporativo de Bold Branding! ¿Con quién tengo el gusto de hablar?</div>
+    </div>
+    <div class="ai-input-row">
+      <label style="cursor:pointer;display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;color:var(--blue50);">
+        📎<input type="file" id="aiFileInput" style="display:none;" accept=".pdf,.xlsx,.csv,.txt,.png,.jpg" onchange="handleAIFile(event)">
+      </label>
+      <input type="text" id="aiInput" placeholder="Consulta sobre inventario, solicitudes..." onkeydown="if(event.key==='Enter')sendAI()">
+      <button class="send-btn" onclick="sendAI()" id="aiSendBtn">▶</button>
+    </div>
+  </div>
+  <button class="ai-fab-btn" onclick="toggleAI()" id="aiFabBtn" style="background:var(--blue);color:white;font-size:1.5rem;">🤖</button>
+</div>
+
+<!-- API MODAL -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeApiModal()">✕</button>
+    <div class="modal-icon">⚡</div>
+    <div class="modal-title">Conectar Bold AI</div>
+    <div class="modal-sub">Ingresa tu API Key de Anthropic para activar el asistente corporativo.</div>
+    <input type="password" class="modal-input" id="apiKeyInput" placeholder="sk-ant-...">
+    <button class="btn btn-primary" style="width:100%;" onclick="saveApiKey()">Guardar y Activar</button>
+    <div style="margin-top:1rem;text-align:center;">
+      <a href="https://console.anthropic.com/settings/keys" target="_blank" style="font-size:11px;color:var(--coral);font-weight:700;text-decoration:none;">🔑 Obtener API Key en console.anthropic.com</a>
+    </div>
+  </div>
+</div>
+
+<!-- OC MODAL -->
+<div class="modal-overlay" id="ocModal" onclick="if(event.target===this)closeOCModal()" style="align-items:flex-start;padding:2rem 1rem;overflow-y:auto;">
+  <div style="background:#fff;border-radius:20px;padding:0;max-width:820px;width:100%;box-shadow:0 20px 60px rgba(18,30,108,.2);position:relative;overflow:hidden;">
+    <div id="ocModalHeader" style="padding:22px 28px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1.5px solid #eef0f8;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div id="ocModalIcon" style="width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"></div>
+        <div>
+          <div id="ocModalTitle" style="font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--blue);"></div>
+          <div id="ocModalSub" style="font-size:11px;color:var(--blue50);margin-top:2px;"></div>
+        </div>
+      </div>
+      <button onclick="closeOCModal()" style="background:rgba(18,30,108,.07);border:none;border-radius:10px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:0 28px 28px;">
+      <div style="overflow-x:auto;border-radius:12px;border:1.5px solid #eef0f8;margin-top:16px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead id="ocModalThead"></thead>
+          <tbody id="ocModalTbody"></tbody>
+          <tfoot id="ocModalTfoot"></tfoot>
+        </table>
+      </div>
+      <div style="font-size:10px;color:var(--blue50);margin-top:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+        <span>Fuente: 2026 Cotizaciones y OC · Branding TMK · Google Drive</span>
+        <span id="ocDriveLinks"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+//  FIREBASE CONFIG
+// ════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey: "AIzaSyCuSboq1nhhzxi3ABxoGyHruU_uHxWCgLY",
+  authDomain: "dashboard-eventos-bold.firebaseapp.com",
+  projectId: "dashboard-eventos-bold",
+  storageBucket: "dashboard-eventos-bold.firebasestorage.app",
+  messagingSenderId: "553472706914",
+  appId: "1:553472706914:web:464f29eddb67df7aeb043b"
+};
+let db = null;
+const COLL = 'bold-branding-hub';
+
+// ════════════════════════════════════════════
+//  GOOGLE SHEETS — URLs publicadas
+// ════════════════════════════════════════════
+const SHEET_KEYS = {
+  // Documento: "2026 SOLICITUD POP - FULPPI"
+  fulppi:        '2PACX-1vTszfecYfrlUE_2fK595SJ9liZ9gsks2L6tuMqxC8w8rmtl1-M42PV8PWwSJm0cU-zL4EXGIG-Y0CLd',
+  // Documento: "Objetivos TMK"
+  objetivosTMK:  '2PACX-1vSXtJbmw7agAmVjPitHTC-rcmF1-gtkv__ugwY1ah8A_RttiGm-ekynW6big1iV5yErnMyqzjaa1UUC',
+  // Documento: "Calendario Eventos TMK" (mismo doc que objetivos)
+  calendarioTMK: '2PACX-1vSgH9J4IuwjyI4iKMiv00QT6Ve_iZ3VB6_8jCJzVqP7ge2GluHNF7F5Jnq2gUAfa1Zr5qe0VA6cn-um',
+  // Documento: "Comparativo Proveedores"
+  proveedores:   '2PACX-1vSYNnGRlJW--0aP40h1-uF_1eb45WfNx2dIjhex1g9-ccU0nas6U7tv3ewL8WhopQ',
+};
+// ─── IDs de Sheets (para abrir directo en Drive) ───────────────────────
+const SHEET_IDS = {
+  fulppi:       '1apEEKUUc7t5ckbVOvdLEbOnhxz0dtNyql33Ko5wIcVs',
+  eventos:      '1r2qVtowtcZg1g80KMMABc1rOx1cMmjXjY0nJee_iVBc',
+  kitsSheet:    '1DqcdQdxliNzuHs3_b3mJrUUJ4w1l5uLyHXZII6Nu6HQ',
+  proveedores:  '1Rn0uy6WtBu1sEnNMLZeGu9dJtlYkzwQd',
+};
+// ─── Carpetas de Google Drive por categoría ────────────────────────────
+const DRIVE_FOLDERS = {
+  pop:             '1sC8YzmLu5KVoRh_VOg_fDJhTH0yEw0AR',
+  activaciones1:   '1imO3FKNNDovRz5QYET7e9QZlhanx9MDb',
+  activaciones2:   '1bNGX0PemRc8tMzCj4Ni2hiLLQJqEv7-7',
+  activaciones3:   '1OqboQfe_QDjFX8ll6KvicqLJzPQ2DaWX',
+  eventosFotos:    '1MAloVfJqdGlw1Xe36PgNWK7oTH4IEyzY',
+};
+function driveFolder(id){ return `https://drive.google.com/drive/folders/${id}`; }
+function sheetUrl(id,gid){ return `https://docs.google.com/spreadsheets/d/${id}/edit${gid?'?gid='+gid:''}#gid=${gid||0}`; }
+const FULPPI_GIDS = {
+  solicitudes: '0',
+  inventario:  '1208055618',
+  galeria:     '1467481724',
+};
+function pubCSV(key, gid='') {
+  const base = `https://docs.google.com/spreadsheets/d/e/${key}/pub?output=csv`;
+  return gid ? base + `&gid=${gid}` : base;
+}
+const SHEETS = {
+  solicitudes:   { url: pubCSV(SHEET_KEYS.fulppi, FULPPI_GIDS.solicitudes), label: 'Solicitudes generales',   sheetUrl: sheetUrl(SHEET_IDS.fulppi,'0') },
+  inventario:    { url: pubCSV(SHEET_KEYS.fulppi, FULPPI_GIDS.inventario),  label: 'Inventario Fulppi',       sheetUrl: sheetUrl(SHEET_IDS.fulppi,'1208055618') },
+  galeria:       { url: pubCSV(SHEET_KEYS.fulppi, FULPPI_GIDS.galeria),     label: 'Galería Productos',       sheetUrl: sheetUrl(SHEET_IDS.fulppi,'1467481724') },
+  objetivosTMK:  { url: pubCSV(SHEET_KEYS.objetivosTMK, '1726665658'),      label: 'Objetivos TMK Trade',     sheetUrl: sheetUrl(SHEET_IDS.eventos,'1726665658') },
+  eventosTMK:    { url: `https://docs.google.com/spreadsheets/d/e/${SHEET_KEYS.calendarioTMK}/pub?output=csv`, label: 'Eventos TMK 2026', sheetUrl: sheetUrl(SHEET_IDS.eventos,'1961082464') },
+  proveedores:   { url: pubCSV(SHEET_KEYS.proveedores),                     label: 'Comparativo Proveedores', sheetUrl: sheetUrl(SHEET_IDS.proveedores,'1688060218') },
+  kitsSheet:     { url: '',                                                   label: 'Kits Guardados',          sheetUrl: sheetUrl(SHEET_IDS.kitsSheet,'116112180') },
+};
+
+// ════════════════════════════════════════════
+//  PARSE CSV
+// ════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+  return lines.slice(1).map(line => {
+    const cols = []; let cur = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    cols.push(cur.trim());
+    const obj = {};
+    headers.forEach((h,i) => { obj[h] = (cols[i]||'').replace(/^"|"$/g,''); });
+    return obj;
+  }).filter(r => Object.values(r).some(v => v !== ''));
+}
+
+function mapSolicitudRow(row, idx) {
+  const cc       = (row['Centro de costo']||row['C.Costo']||row['CC']||'').trim();
+  const solicita = (row['Quien solicita']||row['Solicita']||row['Responsable']||'').trim();
+  const estadoRaw= (row['Estado actual']||row['Estado']||'').trim();
+  const estado   = (!estadoRaw||estadoRaw.includes('#N/A')) ? 'NO ENTREGADO' : estadoRaw;
+  const articulo = (row['Articulo']||row['Artículo']||row['ARTICULO']||'').trim();
+  const fecha    = (row['Fecha']||'').trim();
+  const destinatario = (row['Nombre Destinatario']||row['Destinatario']||'').trim();
+  const ciudad   = (row['Ciudad']||'').trim();
+  const cantidad = parseInt(String(row['Cantidad']||'0').replace(/[^0-9]/g,''))||0;
+  const orden    = (row['ORDEN']||row['Orden']||'').trim();
+  const mes      = (row['Mes']||row['MES']||'').trim().toLowerCase();
+  const guia     = (row['Guía']||row['Guia']||'').trim();
+  const no       = parseInt(row['No.']||row['No']||idx+1)||(idx+1);
+  if (!articulo && !destinatario) return null;
+  return { id:no, fecha, cc, solicita, destinatario, ciudad, articulo, cantidad, orden, estado, mes, guia, _source:'sheets' };
+}
+
+function isBrandingNazareth(row) {
+  const cc = (row.cc||'').toLowerCase();
+  const solicita = (row.solicita||'').toLowerCase();
+  return cc.includes('branding') && (solicita.includes('nazareth')||solicita.includes('ruiz')||solicita==='');
+}
+
+// ════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════
+const state = {
+  solicitudes:[], inventory:[], eventos:[], kits:[], proveedores:[], objetivosTMK:[],
+  kitItems:{}, activeEventId:null, currentView:'dashboard',
+  solicitudFilter:'all', invFilter:{status:'all',search:''}, provFilter:{status:'all',search:''}, eventFilter:'all',
+};
+
+// ════════════════════════════════════════════
+//  SYNC
+// ════════════════════════════════════════════
+let lastSyncTime=null, syncInProgress=false;
+
+function setSyncState(st) {
+  const btn=document.getElementById('syncBtn'), label=document.getElementById('syncLabel');
+  if(!btn) return;
+  btn.classList.remove('syncing','error');
+  if(st==='loading'){btn.classList.add('syncing');label.textContent='Sincronizando...';}
+  else if(st==='ok'){label.textContent='Sincronizado ✓';setTimeout(()=>{label.textContent='Sincronizar';},3000);}
+  else if(st==='error'){btn.classList.add('error');label.textContent='Error — Reintentar';setTimeout(()=>{btn.classList.remove('error');label.textContent='Sincronizar';},5000);}
+  else{label.textContent='Sincronizar';}
+}
+
+function showSyncBanner(msg,type) {
+  const el=document.getElementById('syncBanner');
+  if(!el) return;
+  const colors={ok:'#f0fdf4',info:'#eff6ff',error:'#fef2f2',warn:'#fffbeb'};
+  const textColors={ok:'#15803d',info:'#1d4ed8',error:'#b91c1c',warn:'#92400e'};
+  el.style.cssText=`display:flex;margin-bottom:1rem;padding:10px 16px;border-radius:10px;font-size:12px;font-weight:700;align-items:center;gap:8px;background:${colors[type]};color:${textColors[type]};`;
+  el.innerHTML=msg;
+  if(type==='ok') setTimeout(()=>{el.style.display='none';},5000);
+}
+
+async function syncAllSheets(silent=false) {
+  if(syncInProgress) return;
+  syncInProgress=true;
+  if(!silent) setSyncState('loading');
+  const results={ok:0,fail:0,rows:0};
+
+  // Solicitudes
+  try {
+    const resp=await fetch(SHEETS.solicitudes.url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const rows=parseCSV(await resp.text());
+    if(rows.length>0){
+      const allMapped=rows.map(mapSolicitudRow).filter(Boolean);
+      const sheetItems=allMapped.filter(isBrandingNazareth);
+      const existingManual=state.solicitudes.filter(s=>s._source!=='sheets');
+      const merged=[...existingManual];
+      sheetItems.forEach(si=>{
+        const idx=merged.findIndex(m=>m.id===si.id&&m._source==='sheets');
+        if(idx===-1) merged.push(si); else merged[idx]=si;
+      });
+      state.solicitudes=merged.sort((a,b)=>a.id-b.id);
+      results.ok++;results.rows+=sheetItems.length;
+      const solPend=sheetItems.filter(s=>['PENDIENTE ALISTAMIENTO','POR PROGRAMAR','TRANSITO NACIONAL','DISTRIBUCIÓN'].includes((s.estado||'').toUpperCase())).length;
+      setNavMeta('solicitudes',sheetItems.length.toLocaleString('es-CO'),solPend>0?'warn':'ok');
+    }
+  } catch(e){console.warn('Solicitudes sync:',e.message);results.fail++;setNavMeta('solicitudes','error','error');}
+
+  // Inventario
+  try {
+    const resp=await fetch(SHEETS.inventario.url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const rows=parseCSV(await resp.text());
+    if(rows.length>0){
+      let updated=0;
+      rows.forEach(row=>{
+        const ref=(row['Código']||row['Codigo']||row['REF']||'').trim().toUpperCase();
+        const nombre=(row['Nombre Producto']||row['Nombre']||'').trim().toUpperCase();
+        const brandingDisp=parseInt(String(row['Branding Disp']||row['Branding_Disp']||'0').replace(/[^0-9]/g,''))||0;
+        if(!ref&&!nombre) return;
+        const invId='inv_'+ref;
+        let item=state.inventory.find(p=>p.id===invId);
+        if(!item&&nombre) item=state.inventory.find(p=>p.nombre===nombre);
+        if(item){item.cantidad=brandingDisp;item._sheetSync=new Date().toISOString();updated++;}
+        else if(ref&&nombre){state.inventory.push({id:invId,ref,nombre,cantidad:brandingDisp,icon:'📦',minimo:10,foto:'',_source:'sheets'});updated++;}
+      });
+      results.ok++;results.rows+=updated;
+      setNavMeta('inventario',updated+' refs','sync');
+    }
+  } catch(e){console.warn('Inventario sync:',e.message);results.fail++;setNavMeta('inventario','error','error');}
+
+  // Galería fotos
+  _galeriaLoaded=false;
+  const nFotos=await syncGaleriaFotos();
+  if(nFotos>0){
+    const invConFoto=state.inventory.filter(i=>i.foto&&i.foto.length>5).length;
+    setNavMeta('inventario',invConFoto+'📷','ok');
+  }
+
+  // Objetivos
+  try {
+    const resp=await fetch(SHEETS.objetivosTMK.url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const rows=parseCSV(await resp.text());
+    if(rows.length>0){
+      state.objetivosTMK=rows.filter(r=>Object.values(r).some(v=>v!==''));
+      if(state.currentView==='objetivos') renderObjetivos();
+      results.ok++;results.rows+=state.objetivosTMK.length;
+      const objDone=state.objetivosTMK.filter(r=>(r['Estado']||'').toLowerCase().includes('terminado')).length;
+      const pct=Math.round((objDone/state.objetivosTMK.length)*100);
+      setNavMeta('objetivos',pct+'%',pct>=80?'ok':pct>=50?'warn':'error');
+    }
+  } catch(e){console.warn('Objetivos sync:',e.message);results.fail++;setNavMeta('objetivos','error','error');}
+
+  // Eventos
+  try {
+    const resp=await fetch(SHEETS.eventosTMK.url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const rows=parseCSV(await resp.text());
+    if(rows.length>0){
+      rows.filter(r=>Object.values(r).some(v=>v!=='')).forEach((row,idx)=>{
+        const mes=(row['Mes']||'').trim();
+        const nombre=(row['Evento']||row['Nombre']||'').trim();
+        const ciudad=(row['Ciudad']||'').trim();
+        const fecha=(row['Fecha']||'').trim();
+        const equipo=(row['Equipo']||'').trim();
+        const parseMoney=s=>parseFloat(String(s).replace(/[$\s.]/g,'').replace(',','.'))||0;
+        const tmk=parseMoney(row['Costo real TMK']||row['Costo Real TMK']||'');
+        const act=parseMoney(row['Costo Activación']||row['Costo Activacion']||'');
+        if(!nombre) return;
+        const existing=state.eventos.find(e=>e.nombre.toLowerCase().includes(nombre.toLowerCase().substring(0,10))||nombre.toLowerCase().includes(e.nombre.toLowerCase().substring(0,10)));
+        if(existing){
+          if(fecha) existing.fecha=fecha;
+          if(equipo) existing.equipo=equipo;
+          if(ciudad) existing.ciudad=ciudad;
+          if(mes) existing.mes=mes;
+          if(tmk>0) existing.inversion=tmk;
+          if(act>0) existing.costoActivacion=act;
+        } else if(nombre&&mes){
+          state.eventos.push({id:Date.now()+idx,mes,nombre,ciudad,fecha,equipo,inversion:tmk,costoActivacion:act,estado:'Pendiente',gastos:[],metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0},kitsAsignados:[],notas:'',_source:'sheets'});
+        }
+      });
+      results.ok++;results.rows+=rows.length;
+      const evR=state.eventos.filter(e=>e.estado==='Realizado').length;
+      const evT=state.eventos.length;
+      setNavMeta('eventos',evR+'/'+evT,evT-evR>0?'warn':'ok');
+    }
+  } catch(e){console.warn('Eventos sync:',e.message);results.fail++;setNavMeta('eventos','error','error');}
+
+  // Proveedores
+  try {
+    const resp=await fetch(SHEETS.proveedores.url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const rows=parseCSV(await resp.text());
+    if(rows.length>0){
+      rows.forEach(row=>{
+        const nombre=(row['NOMBRE DEL ARTÍCULO']||row['Articulo']||row['Producto']||'').trim();
+        const estado=(row['ESTADO']||row['Estado']||'').trim().toUpperCase();
+        if(!nombre) return;
+        const existing=state.proveedores.find(p=>p.nombre.toLowerCase().includes(nombre.toLowerCase().substring(0,6))||nombre.toLowerCase().includes(p.nombre.toLowerCase().substring(0,6)));
+        if(existing&&['SELECCIONADO','RECHAZADO','PENDIENTE'].includes(estado)) existing.estado=estado;
+      });
+      results.ok++;
+      const pSel=state.proveedores.filter(p=>p.estado==='SELECCIONADO').length;
+      const pPend=state.proveedores.filter(p=>(p.estado||'').includes('PENDIENTE')).length;
+      setNavMeta('proveedores',pPend>0?pPend+' pend.':pSel+' sel.',pPend>0?'warn':'ok');
+    }
+  } catch(e){console.warn('Proveedores sync:',e.message);results.fail++;setNavMeta('proveedores','error','error');}
+
+  lastSyncTime=new Date();
+  syncInProgress=false;
+  renderDashboard();
+  if(state.currentView==='solicitudes') renderSolicitudesTable();
+  if(state.currentView==='inventario'){applyFotos();renderInventoryGrid();}
+  if(state.currentView==='kits') renderKits();
+  if(state.currentView==='proveedores') renderProveedoresContainer();
+  if(state.currentView==='eventos') renderEventos();
+  if(state.currentView==='objetivos') renderObjetivos();
+  updateAllNavMeta();
+
+  if(!silent){
+    if(results.fail===0){setSyncState('ok');showSyncBanner(`✅ ${results.rows} registros sincronizados desde Google Sheets · ${lastSyncTime.toLocaleTimeString('es-CO')}`,'ok');}
+    else if(results.ok>0){setSyncState('ok');showSyncBanner(`⚠️ Sincronización parcial — ${results.ok} de ${results.ok+results.fail} fuentes OK.`,'warn');}
+    else{setSyncState('error');showSyncBanner('❌ No fue posible conectar con Google Sheets. Intenta desde una URL https://','error');}
+  }
+}
+
+// ════════════════════════════════════════════
+//  GALERÍA / FOTOS
+// ════════════════════════════════════════════
+let _galeriaLoaded=false, _seedFotoMap=null;
+
+function driveUrlToImg(url) {
+  if(!url||!url.trim()) return '';
+  url=url.trim();
+  let m=url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  m=url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if(m) return `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  if(url.startsWith('https://lh3.googleusercontent.com')||url.startsWith('https://drive.google.com/uc')) return url;
+  return url;
+}
+
+async function syncGaleriaFotos() {
+  try {
+    const url=pubCSV(SHEET_KEYS.fulppi,FULPPI_GIDS.galeria);
+    const resp=await fetch(url);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const rows=parseCSV(await resp.text());
+    if(rows.length===0){_galeriaLoaded=true;return 0;}
+    const headers=Object.keys(rows[0]);
+    const urlCol=headers.find(h=>/url|foto|imagen|image|drive|photo/i.test(h));
+    const refCol=headers.find(h=>/código|codigo|ref|sku/i.test(h));
+    const nameCol=headers.find(h=>/nombre|product|artículo|articulo/i.test(h));
+    if(!urlCol){_galeriaLoaded=true;return 0;}
+    let applied=0;
+    rows.forEach(row=>{
+      const rawUrl=(row[urlCol]||'').trim();
+      if(!rawUrl) return;
+      const fotoUrl=driveUrlToImg(rawUrl);
+      if(!fotoUrl) return;
+      const ref=refCol?(row[refCol]||'').trim().toUpperCase():'';
+      const nombre=nameCol?(row[nameCol]||'').trim().toUpperCase():'';
+      let item=null;
+      if(ref) item=state.inventory.find(p=>p.ref&&p.ref.toUpperCase()===ref);
+      if(!item&&nombre) item=state.inventory.find(p=>p.nombre===nombre||(nombre.length>8&&p.nombre.includes(nombre.substring(0,12)))||(p.nombre.length>8&&nombre.includes(p.nombre.substring(0,12))));
+      if(item){item.foto=fotoUrl;applied++;}
+    });
+    _galeriaLoaded=true;
+    return applied;
+  } catch(e){console.warn('Galería sync:',e.message);return 0;}
+}
+
+function buildSeedFotoMap() { if(_seedFotoMap) return; _seedFotoMap={}; }
+function applyFotos() { buildSeedFotoMap(); }
+
+async function refreshFotos() {
+  const btn=document.getElementById('btnRefreshFotos');
+  if(btn){btn.disabled=true;btn.textContent='Cargando...';}
+  _galeriaLoaded=false;
+  const n=await syncGaleriaFotos();
+  if(btn){btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8,6 A12,12 0 0,1 26,18"/><polyline points="22,14 26,18 22,22"/><path d="M24,26 A12,12 0 0,1 6,14"/><polyline points="10,18 6,14 10,10"/></svg> Fotos';}
+  renderInventoryGrid();
+  if(state.currentView==='kits') renderKits();
+  alert(n>0?`✅ ${n} fotos actualizadas desde Google Sheets.`:'⚠️ Sin fotos encontradas. Revisa columnas: "URL Foto", "Foto", "Imagen" o "URL"');
+}
+
+// ════════════════════════════════════════════
+//  FIREBASE
+// ════════════════════════════════════════════
+async function initFirebase() {
+  try {
+    if(!window.firebase?.apps?.length) window.firebase.initializeApp(firebaseConfig);
+    db=window.firebase.firestore();
+    window.storage=window.firebase.storage();
+    document.getElementById('cloudBadge').style.display='flex';
+    await loadFromCloud();
+    setTimeout(()=>syncAllSheets(true),1000);
+  } catch(e){
+    console.warn('Firebase offline:',e);
+    seedLocalData();
+    render();
+    setTimeout(()=>syncAllSheets(true),1500);
+  }
+}
+
+async function loadFromCloud() {
+  try {
+    const sSnap=await db.collection(COLL).doc('data').collection('solicitudes').get();
+    if(!sSnap.empty){state.solicitudes=[];sSnap.forEach(d=>state.solicitudes.push(d.data()));}
+    else{seedSolicitudes();}
+
+    const iSnap=await db.collection(COLL).doc('data').collection('inventory').get();
+    if(!iSnap.empty){state.inventory=[];iSnap.forEach(d=>state.inventory.push(d.data()));}
+    else{seedInventory();}
+
+    const eSnap=await db.collection(COLL).doc('data').collection('eventos').get();
+    if(!eSnap.empty){state.eventos=[];eSnap.forEach(d=>state.eventos.push(d.data()));}
+    else{seedEventos();}
+
+    const kSnap=await db.collection(COLL).doc('data').collection('kits').get();
+    if(!kSnap.empty){state.kits=[];kSnap.forEach(d=>state.kits.push(d.data()));}
+
+    if(!state.objetivosTMK?.length) seedLocalData();
+    try{
+      const objSnap=await db.collection(COLL).doc('data').collection('objetivos').doc('tmk').get();
+      if(objSnap.exists&&objSnap.data()?.rows?.length>0) state.objetivosTMK=objSnap.data().rows;
+    }catch(e){}
+
+    if(!state.proveedores?.length) seedProveedores();
+    render();
+    updateAllNavMeta();
+  } catch(e){
+    console.error(e);
+    seedLocalData();
+    render();
+    updateAllNavMeta();
+  }
+}
+
+async function saveDoc(collection,docId,data) {
+  if(!db) return;
+  try{await db.collection(COLL).doc('data').collection(collection).doc(String(docId)).set(data);}
+  catch(e){console.error('Save error',e);}
+}
+async function deleteDoc(collection,docId) {
+  if(!db) return;
+  try{await db.collection(COLL).doc('data').collection(collection).doc(String(docId)).delete();}
+  catch(e){}
+}
+
+// ════════════════════════════════════════════
+//  SEED DATA — Solicitudes
+// ════════════════════════════════════════════
+function seedSolicitudes() {
+  state.solicitudes = [
+    { id:23, fecha:'20/02/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'victor figueroa', ciudad:'CALI', articulo:'FOLLETO BUNDLE CON BOLD TIENES MÁS', cantidad:1000, orden:'POP7880', estado:'ENTREGADO', mes:'febrero', guia:'34478505417.0', _source:'seed' },
+    { id:27, fecha:'02/03/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Andrés González', ciudad:'MEDELLÍN', articulo:'PARASOL SOMOS BOLD', cantidad:4, orden:'POP7886', estado:'ENTREGADO', mes:'marzo', guia:'34478506172.0', _source:'seed' },
+    { id:28, fecha:'02/03/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Jessica Paez', ciudad:'BOGOTÁ D.C.', articulo:'VOLANTE POS', cantidad:10000, orden:'POP7887', estado:'ENTREGADO', mes:'marzo', guia:'', _source:'seed' },
+    { id:29, fecha:'02/03/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Douglas Chica', ciudad:'JAMUNDÍ', articulo:'KITS SMB SIN PASACUENTAS', cantidad:6, orden:'POP7888', estado:'ENTREGADO', mes:'marzo', guia:'34478506176.0', _source:'seed' },
+    { id:41, fecha:'10/03/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'victor figueroa', ciudad:'CALI', articulo:'PORTAVASOS', cantidad:1000, orden:'POP7908', estado:'ENTREGADO', mes:'marzo', guia:'34478506806.0', _source:'seed' },
+    { id:146, fecha:'25/03/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Sandra Sánchez', ciudad:'MEDELLÍN', articulo:'PARAGUAS BLANCO BOLD', cantidad:4, orden:'POP8004', estado:'ENTREGADO', mes:'marzo', guia:'34478507721.0', _source:'seed' },
+    { id:149, fecha:'25/03/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Kelly Hamburguer', ciudad:'CARTAGENA DE INDIAS', articulo:'LETREROS PARA ESPALDAR TAXIS', cantidad:675, orden:'POP8007', estado:'ENTREGADO', mes:'marzo', guia:'34478507734.0', _source:'seed' },
+    { id:274, fecha:'06/04/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Diana Rojas', ciudad:'BOGOTÁ D.C.', articulo:'LONCHERA REVO', cantidad:1, orden:'POP8051', estado:'ENTREGADO', mes:'abril', guia:'', _source:'seed' },
+    { id:289, fecha:'07/04/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Camila Delgado', ciudad:'BOGOTÁ D.C.', articulo:'SOMBRILLAS ESTAMPADAS BOLD', cantidad:0, orden:'', estado:'NO ENTREGADO', mes:'abril', guia:'#N/A', _source:'seed' },
+    { id:362, fecha:'13/04/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Astrid Arenas', ciudad:'MEDELLÍN', articulo:'KITS SMB SIN PASACUENTAS', cantidad:2, orden:'POP8095', estado:'DISTRIBUCIÓN', mes:'abril', guia:'34478508932.0', _source:'seed' },
+    { id:375, fecha:'15/04/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Sebastian Matthaus', ciudad:'MEDELLÍN', articulo:'ABIERTO / CERRADO', cantidad:30, orden:'POP8110', estado:'ENTREGADO', mes:'abril', guia:'34478509290.0', _source:'seed' },
+    { id:435, fecha:'20/04/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Cristian Solano', ciudad:'BOGOTÁ D.C.', articulo:'TERMO TRANSPARENTE', cantidad:100, orden:'POP8169', estado:'ENTREGADO', mes:'abril', guia:'', _source:'seed' },
+    { id:497, fecha:'24/04/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Brenda Vasquez', ciudad:'BOGOTÁ D.C.', articulo:'CACHUCHA CREER EN TI', cantidad:6, orden:'POP8196', estado:'DISTRIBUCIÓN', mes:'abril', guia:'', _source:'seed' },
+    { id:501, fecha:'24/04/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Cristhian Salas', ciudad:'BUCARAMANGA', articulo:'VELA ARTESANAL BOLD', cantidad:7, orden:'POP8198', estado:'PENDIENTE ALISTAMIENTO', mes:'abril', guia:'', _source:'seed' },
+    { id:514, fecha:'24/04/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Francisco Sepúlveda', ciudad:'Cucuta', articulo:'PARAGUAS BLANCO BOLD', cantidad:6, orden:'POP8199', estado:'TRANSITO NACIONAL', mes:'abril', guia:'34478510137.0', _source:'seed' },
+    { id:534, fecha:'04/05/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Jessica Paola Paez Quintero', ciudad:'BOGOTÁ D.C.', articulo:'VOLANTE POS', cantidad:1000, orden:'POP8212', estado:'ENTREGADO', mes:'mayo', guia:'', _source:'seed' },
+    { id:539, fecha:'04/05/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Yudy Barrera', ciudad:'CALI', articulo:'PASACUENTAS RUSTICOS', cantidad:15, orden:'POP8214', estado:'ENTREGADO', mes:'mayo', guia:'34478511727.0', _source:'seed' },
+    { id:584, fecha:'12/05/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Christian Escobar', ciudad:'BOGOTÁ D.C.', articulo:'BACKING BOLD', cantidad:1, orden:'POP8242', estado:'ENTREGADO', mes:'mayo', guia:'', _source:'seed' },
+    { id:688, fecha:'21/05/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Juan Villalobos', ciudad:'CALI', articulo:'DUFFLE BAG GRANDE', cantidad:1, orden:'POP8309', estado:'PENDIENTE ALISTAMIENTO', mes:'mayo', guia:'', _source:'seed' },
+    { id:703, fecha:'25/05/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Cristhian Salas', ciudad:'BUCARAMANGA', articulo:'PENDON CUENTA EMPRESARIAL Y PAGOS', cantidad:1, orden:'POP8327', estado:'PENDIENTE ALISTAMIENTO', mes:'mayo', guia:'', _source:'seed' },
+    { id:717, fecha:'26/05/2026', cc:'Branding', solicita:'Felipe Clavijo', destinatario:'Bodega ZALT - Ana María Díaz', ciudad:'BOGOTÁ D.C.', articulo:'CUERDA PARA DATÁFONO', cantidad:3625, orden:'POP8331', estado:'PENDIENTE ALISTAMIENTO', mes:'mayo', guia:'', _source:'seed' },
+    { id:734, fecha:'1/06/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Nohora Varón', ciudad:'MANIZALES', articulo:'BACKING BOLD', cantidad:1, orden:'POP8345', estado:'PENDIENTE ALISTAMIENTO', mes:'junio', guia:'', _source:'seed' },
+    { id:751, fecha:'3/06/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Brenda Vasquez', ciudad:'BOGOTÁ D.C.', articulo:'KIT PARA PERIODISTAS 2025', cantidad:1, orden:'POP8358', estado:'PENDIENTE ALISTAMIENTO', mes:'junio', guia:'', _source:'seed' },
+    { id:767, fecha:'5/06/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Emmanuel Herrera', ciudad:'BOGOTÁ D.C.', articulo:'SPOTS LUZ FRÍA CON BASE', cantidad:12, orden:'POP8364', estado:'PENDIENTE ALISTAMIENTO', mes:'junio', guia:'', _source:'seed' },
+    { id:782, fecha:'5/06/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Leidy garcia', ciudad:'MEDELLÍN', articulo:'KITS SMB CON PASACUENTAS', cantidad:2, orden:'POP8366', estado:'PENDIENTE ALISTAMIENTO', mes:'junio', guia:'', _source:'seed' },
+    { id:786, fecha:'5/06/2026', cc:'Branding', solicita:'Nazareth Ruiz', destinatario:'Mario Lopez', ciudad:'PASTO', articulo:'ESMALTE TRANSPARENTE BOLD', cantidad:100, orden:'POP8367', estado:'PENDIENTE ALISTAMIENTO', mes:'junio', guia:'', _source:'seed' },
+  ];
+}
+
+// ════════════════════════════════════════════
+//  SEED DATA — Inventario
+// ════════════════════════════════════════════
+function seedInventory() {
+  state.inventory = [
+    { id:'inv_ABIERTO_CERRADO', ref:'ABIERTO_CERRADO', nombre:'ABIERTO / CERRADO', cantidad:958, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_ALCANCIAS', ref:'ALCANCIAS', nombre:'ALCANCIAS BOLD', cantidad:61, icon:'🐷', minimo:10, foto:'' },
+    { id:'inv_ANTIBACTERIAL', ref:'ANTIBACTERIAL', nombre:'GEL ANTIBACTERIAL', cantidad:2433, icon:'🧴', minimo:10, foto:'' },
+    { id:'inv_BASURITAS', ref:'BASURITAS', nombre:'BASURITAS', cantidad:1745, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_BLOC_NOTAS', ref:'BLOC_NOTAS', nombre:'BLOC DE NOTAS', cantidad:635, icon:'📓', minimo:10, foto:'' },
+    { id:'inv_BOLSA_MERCADO', ref:'BOLSA_MERCADO', nombre:'BOLSAS TIPO MERCADO', cantidad:100, icon:'👜', minimo:10, foto:'' },
+    { id:'inv_BOLSAS_STORE', ref:'BOLSAS_STORE', nombre:'BOLSA DE REGALO BOLD STORE', cantidad:60, icon:'👜', minimo:10, foto:'' },
+    { id:'inv_CAJA_HAMBURGUESA', ref:'CAJA_HAMBURGUESA', nombre:'CAJA FDH', cantidad:893, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_CALENDARIOS_2024', ref:'CALENDARIOS_2024', nombre:'CALENDARIOS 2024', cantidad:107, icon:'📅', minimo:10, foto:'' },
+    { id:'inv_CUADERNO_CLIENTES', ref:'CUADERNO_CLIENTES', nombre:'CUADERNO CLIENTES', cantidad:91, icon:'📔', minimo:10, foto:'' },
+    { id:'inv_CUERDA_BOLD', ref:'CUERDA_BOLD', nombre:'CUERDA PARA DATÁFONO', cantidad:262, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_DUFFLE_GRANDE', ref:'DUFFLE_GRANDE', nombre:'DUFFLE BAG GRANDE', cantidad:241, icon:'👜', minimo:10, foto:'' },
+    { id:'inv_DUFFLE_PEQUEÑA', ref:'DUFFLE_PEQUEÑA', nombre:'DUFFLE BAG PEQUEÑA', cantidad:0, icon:'👜', minimo:10, foto:'' },
+    { id:'inv_ESFERO_BLANCO', ref:'ESFERO_BLANCO', nombre:'ESFERO BLANCO BOLD', cantidad:0, icon:'✏️', minimo:10, foto:'' },
+    { id:'inv_ESPALDAR_TAXIS', ref:'ESPALDAR_TAXIS', nombre:'LETREROS PARA ESPALDAR TAXIS', cantidad:1986, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_GORRA_AZUL', ref:'GORRA_AZUL', nombre:'CACHUCHA CREER EN TI', cantidad:12, icon:'🧢', minimo:10, foto:'' },
+    { id:'inv_KIT_RECARGAS', ref:'KIT_RECARGAS', nombre:'KIT PAGOS Y RECARGAS', cantidad:250, icon:'🎁', minimo:10, foto:'' },
+    { id:'inv_MESA_RESERVADA', ref:'MESA_RESERVADA', nombre:'MESA RESERVADA AVISO', cantidad:300, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_PARAGUAS_BLAN', ref:'PARAGUAS_BLAN', nombre:'PARAGUAS BLANCO BOLD', cantidad:0, icon:'☂️', minimo:10, foto:'' },
+    { id:'inv_PASACUENTAS_CUERO', ref:'PASACUENTAS_CUERO', nombre:'PASACUENTAS CUERO', cantidad:457, icon:'💼', minimo:10, foto:'' },
+    { id:'inv_PASACUENTAS_RUSTICO', ref:'PASACUENTAS_RUSTICO', nombre:'PASACUENTAS RUSTICOS', cantidad:435, icon:'💼', minimo:10, foto:'' },
+    { id:'inv_PORTAVASOS', ref:'PORTAVASOS', nombre:'PORTAVASOS', cantidad:51897, icon:'☕', minimo:10, foto:'' },
+    { id:'inv_RELOJ_PARED', ref:'RELOJ_PARED', nombre:'RELOJ DE PARED BOLD', cantidad:34, icon:'⏰', minimo:10, foto:'' },
+    { id:'inv_ROMPETRAFICOS', ref:'ROMPETRAFICOS', nombre:'ROMPE TRÁFICOS PARA COMERCIOS', cantidad:108, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_STICKER_20X20', ref:'STICKER_20X20', nombre:'STICKER 20*20 CON SOBRE', cantidad:6466, icon:'🏷️', minimo:10, foto:'' },
+    { id:'inv_STICKER_RESPALDO', ref:'STICKER_RESPALDO', nombre:'STICKER DATÁFONO RESPALDO', cantidad:9487, icon:'🏷️', minimo:10, foto:'' },
+    { id:'inv_STICKERS_TAXIS', ref:'STICKERS_TAXIS', nombre:'STICKERS PARA TAXIS', cantidad:337, icon:'🏷️', minimo:10, foto:'' },
+    { id:'inv_TERMO_TRANSPARENTE', ref:'TERMO_TRANSPARENTE', nombre:'TERMO TRANSPARENTE', cantidad:0, icon:'🧊', minimo:10, foto:'' },
+    { id:'inv_TOTE_BAG', ref:'TOTE_BAG', nombre:'TOTE BAG', cantidad:3, icon:'👜', minimo:10, foto:'' },
+    { id:'inv_TULA_HAPPY', ref:'TULA_HAPPY', nombre:'TULA HAPPY', cantidad:387, icon:'👝', minimo:10, foto:'' },
+    { id:'inv_VOLANTE_POS', ref:'VOLANTE_POS', nombre:'VOLANTE POS', cantidad:3500, icon:'📋', minimo:10, foto:'' },
+    { id:'inv_FOLLETO_BUNDLE', ref:'FOLLETO_BUNDLE', nombre:'FOLLETO BUNDLE CON BOLD TIENES MÁS', cantidad:127, icon:'📄', minimo:10, foto:'' },
+    { id:'inv_KITS_SMB_SP', ref:'KITS_SMB_SP', nombre:'KITS SMB SIN PASACUENTAS', cantidad:147, icon:'🎁', minimo:10, foto:'' },
+    { id:'inv_KITS_SMB_CP', ref:'KITS_SMB_CP', nombre:'KITS SMB CON PASACUENTAS', cantidad:30, icon:'🎁', minimo:10, foto:'' },
+    { id:'inv_PENDON_EVENTOS', ref:'PENDON_EVENTOS', nombre:'PENDON CUENTA EMPRESARIAL Y PAGOS', cantidad:1, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_BACKING_BOLD', ref:'BACKING_BOLD', nombre:'BACKING BOLD', cantidad:5, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_ESTRUCTURA_BANNER', ref:'ESTRUCTURA_BANNER', nombre:'ESTRUCTURA BANNER', cantidad:6, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_STAND_BOLD', ref:'STAND_BOLD', nombre:'STAND BOLD', cantidad:0, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_AGENDA_BOLD', ref:'AGENDA_BOLD', nombre:'AGENDA BOLD HUBS', cantidad:35, icon:'📔', minimo:10, foto:'' },
+    { id:'inv_BOLSA_CREER', ref:'BOLSA_CREER', nombre:'BOLSA CREER EN TI', cantidad:4272, icon:'👜', minimo:10, foto:'' },
+    { id:'inv_PLEGABLES_ONBOARD', ref:'PLEGABLES_ONBOARD', nombre:'PLEGABLES NUEVOS ONBOARDING', cantidad:10346, icon:'📋', minimo:10, foto:'' },
+    { id:'inv_HABLADOR_PAGA', ref:'HABLADOR_PAGA', nombre:'HABLADOR PAGA FÁCIL QR', cantidad:105, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_ROMPETRAFICO_NEGOCIO', ref:'ROMPETRAFICO_NEGOCIO', nombre:'ROMPETRAFICO MI NEGOCIO ES BOLD', cantidad:43, icon:'📦', minimo:10, foto:'' },
+    { id:'inv_CUADERNILLO_BOLD', ref:'CUADERNILLO_BOLD', nombre:'CUADERNILLO BOLD', cantidad:13, icon:'📓', minimo:10, foto:'' },
+    { id:'inv_BOMBA_AZUL', ref:'BOMBA_AZUL', nombre:'GLOBO AZUL BOLD UNIDAD', cantidad:1328, icon:'🎈', minimo:10, foto:'' },
+    { id:'inv_BOMBA_ROJA', ref:'BOMBA_ROJA', nombre:'GLOBO ROJO BOLD', cantidad:1413, icon:'🎈', minimo:10, foto:'' },
+    { id:'inv_TARJETA_PRES', ref:'TARJETA_PRES', nombre:'TARJETA DE PRESENTACIÓN', cantidad:1332, icon:'📦', minimo:10, foto:'' },
+  ];
+}
+
+// ════════════════════════════════════════════
+//  SEED DATA — Eventos
+// ════════════════════════════════════════════
+function seedEventos() {
+  state.eventos = [
+    { id:1,  mes:'Febrero',   equipo:'TMK - Online P', fecha:'26 de febrero',         nombre:'Five Festival Agentes de IA',    ciudad:'Bogotá',        estado:'Realizado', inversion:800000,   costoActivacion:325486,  gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:2,  mes:'Marzo',     equipo:'TMK - Online P', fecha:'Marzo 28',              nombre:'Five Festival',                  ciudad:'Medellín',      estado:'Realizado', inversion:1000000,  costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:3,  mes:'Abril',     equipo:'Trade',          fecha:'26/04',                 nombre:'XVII Vuelta atlética San Andrés',ciudad:'San Andrés',    estado:'Realizado', inversion:5000000,  costoActivacion:1036800, gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:20, mes:'Abril',     equipo:'TMK - Online P', fecha:'29/04 al 30/04',        nombre:'Activación de Bundle Hubs',     ciudad:'Nivel Nacional', estado:'Realizado', inversion:0,        costoActivacion:12499000,gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:21, mes:'Mayo',      equipo:'TMK - Online P', fecha:'05/05',                 nombre:'Brandeo Carritos Mastercard',   ciudad:'Bogotá',        estado:'Realizado', inversion:0,        costoActivacion:2250960, gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'2 Plus y un SonoQR' },
+    { id:4,  mes:'Mayo',      equipo:'TMK - Online P', fecha:'07 de mayo',            nombre:'E-Commerce Day',                ciudad:'Bogotá',        estado:'Realizado', inversion:10000000, costoActivacion:3508600, gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'', media:[] },
+    { id:5,  mes:'Mayo',      equipo:'TMK - CS',       fecha:'30/04 al 03/05 - 7/05 al 10/05', nombre:'Feria EVA Edición Madres', ciudad:'Bogotá',   estado:'Realizado', inversion:42500000, costoActivacion:36328000,gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'Spot 360', media:[] },
+    { id:6,  mes:'Mayo',      equipo:'TMK - CS',       fecha:'30/04 al 03/05',        nombre:'Mercado de madres Oviedo',      ciudad:'Medellín',      estado:'Realizado', inversion:0,        costoActivacion:1025000, gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'', media:[] },
+    { id:8,  mes:'Mayo',      equipo:'TMK',            fecha:'23 de mayo',            nombre:'Anglo Fest',                    ciudad:'Bogotá',        estado:'Realizado', inversion:8000000,  costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:22, mes:'Mayo',      equipo:'TMK',            fecha:'28 de mayo',            nombre:'Macrorruedas Compensar',        ciudad:'Bogotá',        estado:'Realizado', inversion:0,        costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'', media:[] },
+    { id:9,  mes:'Julio',     equipo:'TMK - CS',       fecha:'05 al 07 de Junio',     nombre:'Expormujer SFW',                ciudad:'Santander',     estado:'Pendiente', inversion:0,        costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:10, mes:'Agosto',    equipo:'TMK - CS',       fecha:'25 Jun al 05 Jul',      nombre:'WEIN',                          ciudad:'Medellín',      estado:'Pendiente', inversion:47500000, costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:12, mes:'Septiembre',equipo:'TMK - CS',       fecha:'07 al 09 de Agosto',    nombre:'Santander Fashion Week',        ciudad:'Santander',     estado:'Pendiente', inversion:35000000, costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:13, mes:'Septiembre',equipo:'TMK - CS',       fecha:'Sept',                  nombre:'Latam Fintech Bquilla',         ciudad:'Barranquilla',  estado:'Pendiente', inversion:0,        costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:15, mes:'Octubre',   equipo:'TMK',            fecha:'9 al 11/08',            nombre:'Gran Fondo Nairo',              ciudad:'Cartagena',     estado:'Pendiente', inversion:70000000, costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:16, mes:'Diciembre', equipo:'TMK - Online P', fecha:'16 al 18/10',           nombre:'Feria Effix',                   ciudad:'Medellín',      estado:'Pendiente', inversion:8199120,  costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+    { id:18, mes:'Diciembre', equipo:'TMK - CS',       fecha:'Diciembre',             nombre:'Feria EVA Navidad',             ciudad:'Bogotá',        estado:'Pendiente', inversion:22500000, costoActivacion:0,       gastos:[], metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0}, kitsAsignados:[], notas:'' },
+  ];
+}
+
+// ════════════════════════════════════════════
+//  SEED DATA — Proveedores (muestra)
+// ════════════════════════════════════════════
+function seedProveedores() {
+  state.proveedores = [
+    { id:4, nombre:'Parasol', descripcion:'Parasol con estructura metálica acerada 8 puntas', estado:'SELECCIONADO', cotizaciones:[{proveedor:'PARAGUAS Y SOMBRILLAS ALTO IMPACTO SAS',precioUnit:'$895,000',cantidad:9,total:'$9,585,450'}], foto:'' },
+    { id:12, nombre:'STAND', descripcion:'Counter plástico desarmable 82cm x 200cm', estado:'SELECCIONADO', cotizaciones:[{proveedor:'DÍGITOS & DISEÑOS',precioUnit:'$483',cantidad:24,total:'$13,791'}], foto:'' },
+    { id:13, nombre:'PENDÓN TIPO ARAÑA', descripcion:'Portapendón tipo araña 2m x 1m con impresión digital en banner', estado:'SELECCIONADO', cotizaciones:[{proveedor:'DÍGITOS & DISEÑOS',precioUnit:'$120',cantidad:24,total:'$3,422'}], foto:'' },
+    { id:15, nombre:'ABANICO', descripcion:'Abanico 24x14cm impresión en maule, plastificado mate', estado:'SELECCIONADO', cotizaciones:[{proveedor:'DÍGITOS & DISEÑOS',precioUnit:'$844',cantidad:2000,total:'$2,008,720'}], foto:'' },
+    { id:27, nombre:'BOLSA', descripcion:'Bolsa plana semi impermeable manija 55cm', estado:'SELECCIONADO', cotizaciones:[{proveedor:'BOLSA VIDA S.A.S.',precioUnit:'$7,750',cantidad:5000,total:'$46,112,500'}], foto:'' },
+    { id:36, nombre:'CARPA', descripcion:'Carpa con artes en techo y estructura plegable 3x3', estado:'SELECCIONADO', cotizaciones:[{proveedor:'GRÁFICAS IBÁÑEZ S.A.S.',precioUnit:'$2,502,500',cantidad:1,total:'$2,977,975'}], foto:'' },
+    { id:41, nombre:'PATINETAVALLA', descripcion:'Alquiler patineta · Bogotá + otras ciudades · 5 und · 2 días', estado:'SELECCIONADO', cotizaciones:[{proveedor:'P&P MEDIOS ALTERNATIVOS',precioUnit:'$266,667',cantidad:10,total:'$3,173,337'}], foto:'' },
+    { id:43, nombre:'POP MAN', descripcion:'Alquiler popman banner + personal logístico', estado:'SELECCIONADO', cotizaciones:[{proveedor:'P&P MEDIOS ALTERNATIVOS',precioUnit:'$245,000',cantidad:8,total:'$2,332,400'}], foto:'' },
+    { id:53, nombre:'AGENDA', descripcion:'Agenda tapa dura lomo · propalcote 150gr · plástico mate', estado:'SELECCIONADO', cotizaciones:[{proveedor:'GRÁFICAS IBÁÑEZ S.A.S.',precioUnit:'$14,781',cantidad:400,total:'$7,035,756'}], foto:'' },
+    { id:57, nombre:'VOLANTE', descripcion:'Volantes tintas 4x0 · 9x21.5cm', estado:'SELECCIONADO', cotizaciones:[{proveedor:'DÍGITOS & DISEÑOS',precioUnit:'$119',cantidad:5000,total:'$708,050'}], foto:'' },
+    { id:58, nombre:'SPOT 360 COMPRA', descripcion:'Piso melamínico 3x3m + floorgraphic + plataforma giratoria', estado:'SELECCIONADO', cotizaciones:[{proveedor:'MAS IMAGEN PRODUCCIÓN',precioUnit:'$22,165,000',cantidad:1,total:'$26,376,350'}], foto:'' },
+    { id:62, nombre:'FOLLETO', descripcion:'Trípticos 115gr · 50.000 unidades', estado:'SELECCIONADO', cotizaciones:[{proveedor:'DÍGITOS & DISEÑOS',precioUnit:'$154',cantidad:50000,total:'$9,163,000'}], foto:'' },
+    { id:70, nombre:'BOLÍGRAFO ROLLER', descripcion:'Bolígrafo Roller Santorini marcado 1 tinta', estado:'SELECCIONADO', cotizaciones:[{proveedor:'DÍGITOS & DISEÑOS',precioUnit:'',cantidad:400,total:''}], foto:'' },
+    { id:30, nombre:'PUFF COMPRA', descripcion:'Puff en lona azul oscuro relleno de icopor con brandeo BOLD', estado:'SELECCIONADO', cotizaciones:[{proveedor:'MAS IMAGEN PRODUCCIÓN',precioUnit:'$160,000',cantidad:6,total:'$1,142,400'}], foto:'' },
+    { id:83, nombre:'PARAGUAS', descripcion:'Paraguas tipo golf medium 29 pulgadas estructura metálica', estado:'PENDIENTE DE NEGOCIACIÓN', cotizaciones:[{proveedor:'ALTO IMPACTO',precioUnit:'$38,500',cantidad:200,total:'$9,163,000'}], foto:'' },
+    { id:25, nombre:'BOLSA ALGODÓN', descripcion:'Bolsa lienzo algodón 100% biodegradable manijas hiladillo', estado:'PENDIENTE DE NEGOCIACIÓN', cotizaciones:[{proveedor:'BOLSA VIDA S.A.S.',precioUnit:'$9,821',cantidad:5000,total:'$58,434,950'}], foto:'' },
+    { id:5, nombre:'STAND TIPO B', descripcion:'Counter con estructura metálica ruedas, impresión vinilo adhesivo', estado:'RECHAZADO', cotizaciones:[{proveedor:'MAS IMAGEN PRODUCCIÓN',precioUnit:'$850,000',cantidad:24,total:'$24,276,000'}], foto:'' },
+    { id:9, nombre:'BACKING GRANDE', descripcion:'Backings ajustables en banner 13oz 230x100 / 300x300cm', estado:'RECHAZADO', cotizaciones:[{proveedor:'MAS IMAGEN PRODUCCIÓN',precioUnit:'$1,680,000',cantidad:24,total:'$47,980,800'}], foto:'' },
+  ];
+}
+
+// ════════════════════════════════════════════
+//  SEED DATA — Objetivos TMK
+// ════════════════════════════════════════════
+function seedLocalData() {
+  if(!state.solicitudes.length) seedSolicitudes();
+  if(!state.inventory.length) seedInventory();
+  if(!state.eventos.length) seedEventos();
+  if(!state.proveedores.length) seedProveedores();
+  state.objetivosTMK = [
+    {Proyecto:'Activación Bundle Hubs',Categoría:'Activaciones',Prioridad:'Baja',Actividades:'Caravana en Patineta Valla/Pop Man',Estado:'En proceso',Fecha:'29/04/2026',Responsable:'Naz',Observaciones:'29 y 30 de Abril a nivel nacional'},
+    {Proyecto:'Activación Bundle Hubs',Categoría:'Activaciones',Prioridad:'Baja',Actividades:'Cotización',Estado:'Terminado',Fecha:'16/03/2026',Responsable:'Jair',Observaciones:'Nos vamos con P&P medios'},
+    {Proyecto:'Activación Bundle Hubs',Categoría:'Activaciones',Prioridad:'Baja',Actividades:'Solicitud OC',Estado:'Terminado',Fecha:'24/03/2026',Responsable:'Bren',Observaciones:'Se envió solicitud de OC'},
+    {Proyecto:'Activación Bundle Hubs',Categoría:'Activaciones',Prioridad:'Baja',Actividades:'Producción',Estado:'Terminado',Fecha:'25/03/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Activación Bundle Hubs',Categoría:'Activaciones',Prioridad:'Baja',Actividades:'Ejecución',Estado:'Terminado',Fecha:'29 y 30 de Abril',Responsable:'Naz',Observaciones:''},
+    {Proyecto:'Envíos de POP',Categoría:'POP',Prioridad:'Baja',Actividades:'Envío de excedente POP Mastercard',Estado:'Terminado',Fecha:'26/03/2026',Responsable:'Bren',Observaciones:'Se envió a Medellín, Manizales, Cali, Cúcuta'},
+    {Proyecto:'Envíos de POP',Categoría:'POP',Prioridad:'Baja',Actividades:'Envío de pasacuentas',Estado:'Terminado',Fecha:'27/03/2026',Responsable:'Bren',Observaciones:'50 Nohora Varón y 5 Leidy García'},
+    {Proyecto:'Envíos de POP',Categoría:'POP',Prioridad:'Baja',Actividades:'Envío Cintas con QR',Estado:'Terminado',Fecha:'21/04/2026',Responsable:'Bren',Observaciones:'2879 unidades QR y 200 cintas a Carlos Garnica'},
+    {Proyecto:'Creación de Kits',Categoría:'POP',Prioridad:'Baja',Actividades:'Creación de kits POP',Estado:'Terminado',Fecha:'31/03/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Pasacuentas',Categoría:'POP',Prioridad:'Baja',Actividades:'Negociación',Estado:'Terminado',Fecha:'01/03/2026',Responsable:'Jair',Observaciones:''},
+    {Proyecto:'Pasacuentas',Categoría:'POP',Prioridad:'Baja',Actividades:'Solicitud OC',Estado:'Terminado',Fecha:'23/04/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Pasacuentas',Categoría:'POP',Prioridad:'Baja',Actividades:'Distribución',Estado:'Iniciado',Fecha:'',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Abierto/Cerrado',Categoría:'POP',Prioridad:'Baja',Actividades:'Negociación',Estado:'Terminado',Fecha:'01/03/2026',Responsable:'Jair',Observaciones:''},
+    {Proyecto:'Abierto/Cerrado',Categoría:'POP',Prioridad:'Baja',Actividades:'Solicitud OC',Estado:'Terminado',Fecha:'22/04/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Abierto/Cerrado',Categoría:'POP',Prioridad:'Baja',Actividades:'Producción',Estado:'En proceso',Fecha:'22/04/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Evento OP Five Festival',Categoría:'Ferias y Eventos',Prioridad:'Baja',Actividades:'Ejecución',Estado:'Terminado',Fecha:'26/03/2026',Responsable:'Naz',Observaciones:''},
+    {Proyecto:'FORMULARIO TOH',Categoría:'Ferias y Eventos',Prioridad:'Baja',Actividades:'Creación de formulario',Estado:'Terminado',Fecha:'22/05/2026',Responsable:'Naz',Observaciones:''},
+    {Proyecto:'FORMULARIO TOH',Categoría:'Ferias y Eventos',Prioridad:'Baja',Actividades:'Creación de QR',Estado:'En proceso',Fecha:'22/05/2026',Responsable:'Bren',Observaciones:'Se solicita ayuda a Isa para crear el QR'},
+    {Proyecto:'FORMULARIO LEADS',Categoría:'Ferias y Eventos',Prioridad:'Baja',Actividades:'Creación de formulario',Estado:'Terminado',Fecha:'22/05/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'FORMULARIO LEADS',Categoría:'Ferias y Eventos',Prioridad:'Baja',Actividades:'Creación de QR',Estado:'En proceso',Fecha:'',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Patrocinio Vuelta Atlética San Andrés',Categoría:'Ferias y Eventos',Prioridad:'Baja',Actividades:'Ejecución Evento',Estado:'Iniciado',Fecha:'26/04/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Stands Portátiles',Categoría:'Hubs',Prioridad:'Baja',Actividades:'Despachos',Estado:'Terminado',Fecha:'12/05/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Anglo Fest',Categoría:'Ferias y Eventos',Prioridad:'Baja',Actividades:'Ejecución',Estado:'Terminado',Fecha:'23/05/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'Anglo Fest',Categoría:'Ferias y Eventos',Prioridad:'Baja',Actividades:'Facturación',Estado:'Terminado',Fecha:'',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'BRANEO FACHADAS HUBS CAMPAÑA',Categoría:'Hubs',Prioridad:'Alta',Actividades:'Cotización proveedores',Estado:'Terminado',Fecha:'22/05/2026',Responsable:'Naz',Observaciones:''},
+    {Proyecto:'BRANEO FACHADAS HUBS CAMPAÑA',Categoría:'Hubs',Prioridad:'Alta',Actividades:'Elección de proveedor',Estado:'Sin iniciar',Fecha:'',Responsable:'Naz',Observaciones:''},
+    {Proyecto:'BRANEO FACHADAS HUBS CAMPAÑA',Categoría:'Hubs',Prioridad:'Alta',Actividades:'Solicitud OC',Estado:'Sin iniciar',Fecha:'',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'WEIN JUNIO',Categoría:'Ferias y Eventos',Prioridad:'Alta',Actividades:'WEIN JUNIO',Estado:'Iniciado',Fecha:'',Responsable:'Naz',Observaciones:''},
+    {Proyecto:'WEIN AGOSTO',Categoría:'Ferias y Eventos',Prioridad:'Alta',Actividades:'WEIN AGOSTO',Estado:'Iniciado',Fecha:'',Responsable:'',Observaciones:''},
+    {Proyecto:'SANTANDER FASHION WEEK',Categoría:'Ferias y Eventos',Prioridad:'Alta',Actividades:'Confirmación de Patrocinio',Estado:'En proceso',Fecha:'',Responsable:'Naz',Observaciones:''},
+    {Proyecto:'LATAM FINTECH BARRANQUILLA',Categoría:'Ferias y Eventos',Prioridad:'Media',Actividades:'Contrato',Estado:'En proceso',Fecha:'',Responsable:'Bren',Observaciones:'Debe enviarse antes del 15 de junio'},
+    {Proyecto:'100 KIT REGALO CORPORATIVO',Categoría:'Activaciones',Prioridad:'Alta',Actividades:'Orden de compra',Estado:'En proceso',Fecha:'',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'100 KIT REGALO CORPORATIVO',Categoría:'Activaciones',Prioridad:'Alta',Actividades:'Producción',Estado:'Sin iniciar',Fecha:'',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'CREACIÓN DE DASHBOARD',Categoría:'Otros',Prioridad:'Baja',Actividades:'Módulo Solicitudes + Inventario',Estado:'Terminado',Fecha:'01/06/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'CREACIÓN DE DASHBOARD',Categoría:'Otros',Prioridad:'Baja',Actividades:'Sidebar con badges en vivo',Estado:'Terminado',Fecha:'26/06/2026',Responsable:'Bren',Observaciones:''},
+    {Proyecto:'CREACIÓN DE DASHBOARD',Categoría:'Otros',Prioridad:'Baja',Actividades:'Galería de fotos en vivo desde Sheets',Estado:'Terminado',Fecha:'26/06/2026',Responsable:'Bren',Observaciones:''},
+  ];
+}
+
+// ════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════
+const fmt=(n)=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0}).format(n||0);
+const fmtN=(n)=>new Intl.NumberFormat('es-CO').format(n||0);
+
+function statusBadge(s) {
+  const val=(s||'').trim();
+  if(!val||val==='—'||val.includes('#N/A')||val==='NO ENTREGADO') return `<span class="badge red">✕ NO ENTREGADO</span>`;
+  const sl=val.toLowerCase();
+  if(sl.includes('entregado')&&!sl.includes('no')) return `<span class="badge green">✓ ${val}</span>`;
+  if(sl.includes('distribuc')||sl.includes('transito')||sl.includes('tránsito')) return `<span class="badge blue">🚚 ${val}</span>`;
+  if(sl.includes('cancelado')) return `<span class="badge red">✕ ${val}</span>`;
+  if(sl.includes('pendiente')||sl.includes('alistamiento')||sl.includes('programar')) return `<span class="badge amber">⏳ ${val}</span>`;
+  return `<span class="badge gray">${val}</span>`;
+}
+
+// ════════════════════════════════════════════
+//  NAVEGACIÓN
+// ════════════════════════════════════════════
+function switchView(view,btn) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  if(btn) btn.classList.add('active');
+  state.currentView=view;
+  const sidebar=document.getElementById('sidebar');
+  const overlay=document.getElementById('sidebarOverlay');
+  if(window.innerWidth<=900&&sidebar){sidebar.classList.remove('open');if(overlay) overlay.classList.remove('visible');}
+  if(view==='dashboard') renderDashboard();
+  if(view==='solicitudes') renderSolicitudesTable();
+  if(view==='inventario') renderInventory();
+  if(view==='kits'){if(!_galeriaLoaded) syncGaleriaFotos().then(()=>renderKits());else renderKits();}
+  if(view==='proveedores') renderProveedoresContainer();
+  if(view==='eventos') renderEventos();
+  if(view==='objetivos') renderObjetivos();
+}
+
+function toggleSidebar() {
+  const sidebar=document.getElementById('sidebar');
+  const overlay=document.getElementById('sidebarOverlay');
+  if(!sidebar) return;
+  const isOpen=sidebar.classList.contains('open');
+  if(isOpen){sidebar.classList.remove('open');if(overlay) overlay.classList.remove('visible');}
+  else{sidebar.classList.add('open');if(overlay) overlay.classList.add('visible');}
+}
+
+function toggleSidebarDesktop() {
+  const sidebar=document.getElementById('sidebar');
+  if(!sidebar) return;
+  sidebar.classList.toggle('mini');
+  try{localStorage.setItem('sidebarMini',sidebar.classList.contains('mini')?'1':'0');}catch(e){}
+}
+
+// ════════════════════════════════════════════
+//  RENDER ALL
+// ════════════════════════════════════════════
+function render() {
+  if(!state.solicitudes.length) seedSolicitudes();
+  if(!state.inventory.length) seedInventory();
+  if(!state.eventos.length) seedEventos();
+  if(!state.proveedores.length) seedProveedores();
+  if(!state.objetivosTMK?.length) seedLocalData();
+  applyFotos();
+  renderDashboard();
+  const v=state.currentView;
+  if(v==='solicitudes') renderSolicitudesTable();
+  if(v==='inventario') renderInventoryGrid();
+  if(v==='kits') renderKits();
+  if(v==='proveedores') renderProveedoresContainer();
+  if(v==='eventos') renderEventos();
+  if(v==='objetivos') renderObjetivos();
+  updateAllNavMeta();
+}
+
+// ════════════════════════════════════════════
+//  DASHBOARD CHARTS
+// ════════════════════════════════════════════
+let chartInstances={};
+function eventoTotal(ev){const tmk=parseFloat(ev.inversion)||0;const act=parseFloat(ev.costoActivacion)||0;const pop=parseFloat(ev.popAdquirido)||0;const extras=(ev.gastos||[]).reduce((s,g)=>s+(parseFloat(g.valor)||0),0);return tmk+act+pop+extras;}
+
+function renderDashboard() {
+  const sol=state.solicitudes;
+  const brandingSol=sol.filter(s=>(s.cc||'').toLowerCase().includes('branding'));
+  const entregados=sol.filter(s=>(s.estado||'').toLowerCase().includes('entregado')&&!(s.estado||'').toLowerCase().includes('no')).length;
+  const totalItems=brandingSol.reduce((a,b)=>a+(parseInt(b.cantidad)||0),0);
+  const totalEventos=state.eventos.length;
+  const totalInv=state.inventory.reduce((a,b)=>a+(parseInt(b.cantidad)||0),0);
+  const totalTMK=state.eventos.reduce((a,ev)=>a+(parseFloat(ev.inversion)||0),0);
+  const totalAct=state.eventos.reduce((a,ev)=>a+(parseFloat(ev.costoActivacion)||0),0);
+
+  document.getElementById('kpiGrid').innerHTML =
+    '<div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:4px;">' +
+      `<div style="background:linear-gradient(135deg,#121E6C 0%,#1e2d8f 100%);border-radius:16px;padding:20px 22px;box-shadow:0 4px 24px rgba(18,30,108,.22);display:flex;align-items:center;gap:16px;"><div style="width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">📊</div><div><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Total Eventos sin IVA</div><div style="font-family:var(--font-display);font-size:1.55rem;font-weight:700;color:#fff;line-height:1;">${fmt(totalTMK)}</div><div style="font-size:10px;color:rgba(255,255,255,.45);margin-top:4px;">Costo real TMK</div></div></div>` +
+      `<div style="background:linear-gradient(135deg,#1a2878 0%,#FF2847 160%);border-radius:16px;padding:20px 22px;box-shadow:0 4px 24px rgba(255,40,71,.18);display:flex;align-items:center;gap:16px;"><div style="width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">⚡</div><div><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Total Activaciones sin IVA</div><div style="font-family:var(--font-display);font-size:1.55rem;font-weight:700;color:#fff;line-height:1;">${fmt(totalAct)}</div><div style="font-size:10px;color:rgba(255,255,255,.45);margin-top:4px;">Bundle Hubs · Mastercard</div></div></div>` +
+      `<div style="background:linear-gradient(135deg,#FF2847 0%,#c91f38 100%);border-radius:16px;padding:20px 22px;box-shadow:0 4px 24px rgba(255,40,71,.22);display:flex;align-items:center;gap:16px;"><div style="width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">📦</div><div><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Total POP Adquirido sin IVA</div><div style="font-family:var(--font-display);font-size:1.55rem;font-weight:700;color:#fff;line-height:1;">${fmt(192551985)}</div><div style="font-size:10px;color:rgba(255,255,255,.45);margin-top:4px;">Según cotizaciones · 16 OCs</div></div></div>` +
+    '</div>' +
+    `<div class="kpi-card"><div class="kpi-icon blue-bg">📋</div><div><div class="kpi-label">Solicitudes Branding</div><div class="kpi-value">${brandingSol.length}</div></div></div>` +
+    `<div class="kpi-card coral"><div class="kpi-icon coral-bg">✅</div><div><div class="kpi-label">Entregadas</div><div class="kpi-value coral">${entregados}</div></div></div>` +
+    `<div class="kpi-card"><div class="kpi-icon blue-bg">📦</div><div><div class="kpi-label">Unidades Despachadas</div><div class="kpi-value">${fmtN(totalItems)}</div></div></div>` +
+    `<div class="kpi-card coral"><div class="kpi-icon coral-bg">🗓️</div><div><div class="kpi-label">Eventos 2026</div><div class="kpi-value coral">${totalEventos}</div></div></div>` +
+    `<div class="kpi-card"><div class="kpi-icon blue-bg">🗄️</div><div><div class="kpi-label">Stock Total Bodega</div><div class="kpi-value">${fmtN(totalInv)}</div></div></div>`;
+
+  const months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const byMonth=months.map(m=>brandingSol.filter(s=>(s.mes||'').toLowerCase()===m).length);
+  buildChart('chartMonth','bar',{labels:months.map(m=>m.substring(0,3).toUpperCase()),datasets:[{label:'Solicitudes',data:byMonth,backgroundColor:'#121E6C',borderRadius:6}]},{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'#F1F2F6'},ticks:{stepSize:1}}}});
+
+  const statuses={};sol.forEach(s=>{const k=(s.estado||'otro');statuses[k]=(statuses[k]||0)+1;});
+  buildChart('chartStatus','doughnut',{labels:Object.keys(statuses),datasets:[{data:Object.values(statuses),backgroundColor:['#121E6C','#FF2847','#3E4983','#BABDD3','#FCDFE2'],borderWidth:0}]},{plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}});
+
+  const items={};brandingSol.forEach(s=>{const k=(s.articulo||'').substring(0,22);items[k]=(items[k]||0)+(parseInt(s.cantidad)||0);});
+  const sorted=Object.entries(items).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  buildChart('chartItems','bar',{labels:sorted.map(e=>e[0]),datasets:[{label:'Unidades',data:sorted.map(e=>e[1]),backgroundColor:'#FF2847',borderRadius:6}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'#F1F2F6'}},y:{grid:{display:false},ticks:{font:{size:10}}}}});
+
+  const monthOrder=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const invTMK=monthOrder.map(m=>state.eventos.filter(ev=>(ev.mes||'').trim().toLowerCase()===m.toLowerCase()).reduce((s,ev)=>s+(parseFloat(ev.inversion)||0),0));
+  const invAct=monthOrder.map(m=>state.eventos.filter(ev=>(ev.mes||'').trim().toLowerCase()===m.toLowerCase()).reduce((s,ev)=>s+(parseFloat(ev.costoActivacion)||0),0));
+  buildChart('chartEventosMes','bar',{labels:monthOrder.map(m=>m.substring(0,3).toUpperCase()),datasets:[{label:'Costo Evento',data:invTMK,backgroundColor:'#121E6C',borderRadius:0,stack:'inv'},{label:'Activación',data:invAct,backgroundColor:'#FF2847',borderRadius:6,stack:'inv'}]},{plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${fmt(ctx.raw)}`}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'#F1F2F6'},ticks:{font:{size:10},callback:v=>v>=1000000?'$'+Math.round(v/1000000)+'M':v>=1000?'$'+Math.round(v/1000)+'K':'$'+v}}}});
+}
+
+function buildChart(id,type,data,options={}) {
+  const canvas=document.getElementById(id);
+  if(!canvas) return;
+  if(chartInstances[id]){chartInstances[id].destroy();}
+  chartInstances[id]=new Chart(canvas,{type,data,options:{responsive:true,maintainAspectRatio:false,...options}});
+}
+
+// ════════════════════════════════════════════
+//  SOLICITUDES
+// ════════════════════════════════════════════
+let solicitudFilterEstado='all';
+function filterByEstado(v,btn){solicitudFilterEstado=v;document.querySelectorAll('#solicitudFilter .filter-chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderSolicitudesTable();}
+function filterSolicitudes(){renderSolicitudesTable();}
+
+function renderSolicitudesTable() {
+  const search=(document.getElementById('searchSolicitudes')?.value||'').toLowerCase();
+  const filtered=state.solicitudes.filter(s=>{
+    const matchSearch=!search||JSON.stringify(s).toLowerCase().includes(search);
+    let matchEstado=true;
+    if(solicitudFilterEstado!=='all'){
+      const est=(s.estado||'').toUpperCase();
+      if(solicitudFilterEstado==='NO ENTREGADO'){matchEstado=!est||est===''||est==='—'||est==='NO ENTREGADO'||est.includes('N/A');}
+      else{matchEstado=est.includes(solicitudFilterEstado.toUpperCase());}
+    }
+    return matchSearch&&matchEstado;
+  });
+  const tbody=document.getElementById('solicitudesBody');
+  if(!tbody) return;
+  tbody.innerHTML=filtered.map(s=>`<tr><td>${s.id}</td><td>${s.fecha||''}</td><td><span class="badge blue">${s.cc||''}</span></td><td>${s.solicita||''}</td><td>${s.destinatario||''}</td><td>${s.ciudad||''}</td><td style="max-width:200px;">${s.articulo||''}</td><td style="font-weight:700;">${fmtN(s.cantidad)}</td><td style="font-size:10px;">${s.orden||''}</td><td>${statusBadge(s.estado)}</td><td>${s.mes||''}</td></tr>`).join('');
+}
+
+function toggleReportMenu(){const menu=document.getElementById('reportMenu');if(!menu) return;menu.style.display=menu.style.display==='none'?'block':'none';setTimeout(()=>{document.addEventListener('click',function closeMenu(e){if(!document.getElementById('reportDropdownWrap')?.contains(e.target)){menu.style.display='none';document.removeEventListener('click',closeMenu);}});},10);}
+function reportCheckAll(el){if(el.checked){document.querySelectorAll('#reportMenu input[type=checkbox]').forEach(cb=>{if(cb.value!=='all') cb.checked=false;});}}
+
+function getRowsByEstado(tipo){
+  const search=(document.getElementById('searchSolicitudes')?.value||'').toLowerCase();
+  if(tipo==='all') return state.solicitudes;
+  if(tipo==='vista') return state.solicitudes.filter(s=>{const matchSearch=!search||JSON.stringify(s).toLowerCase().includes(search);let matchEstado=true;if(solicitudFilterEstado!=='all'){const est=(s.estado||'').toUpperCase();matchEstado=solicitudFilterEstado==='NO ENTREGADO'?(!est||est==='—'||est==='NO ENTREGADO'||est.includes('N/A')):est.includes(solicitudFilterEstado.toUpperCase());}return matchSearch&&matchEstado;});
+  return state.solicitudes.filter(s=>{const est=(s.estado||'').toUpperCase();return tipo==='NO ENTREGADO'?(!est||est===''||est==='—'||est==='NO ENTREGADO'||est.includes('N/A')):est.includes(tipo.toUpperCase());});
+}
+
+function exportInforme(){
+  const menu=document.getElementById('reportMenu');
+  const checked=[...document.querySelectorAll('#reportMenu input[type=checkbox]:checked')].map(c=>c.value);
+  if(checked.length===0){alert('Selecciona al menos una sección.');return;}
+  if(menu) menu.style.display='none';
+  const headers=['No.','Fecha','Centro Costo','Solicita','Destinatario','Ciudad','Artículo','Cantidad','Orden','Estado','Mes','Guía'];
+  const csvRows=[];
+  checked.forEach(tipo=>{
+    const rows=getRowsByEstado(tipo);
+    const label=tipo==='all'?'TODOS LOS REGISTROS':tipo==='vista'?'VISTA ACTUAL':tipo.toUpperCase();
+    csvRows.push(`--- ${label} (${rows.length} registros) ---`);
+    csvRows.push(headers.join(','));
+    rows.forEach(s=>{csvRows.push([s.id,s.fecha,s.cc,s.solicita,`"${(s.destinatario||'').replace(/"/g,'""')}"`,s.ciudad,`"${(s.articulo||'').replace(/"/g,'""')}"`,s.cantidad,s.orden,s.estado||'NO ENTREGADO',s.mes,s.guia||''].join(','));});
+    csvRows.push('');
+  });
+  csvRows.push(`Informe generado:,${new Date().toLocaleString('es-CO')}`);
+  const fecha=new Date().toLocaleDateString('es-CO').replace(/\//g,'-');
+  const blob=new Blob(['\ufeff'+csvRows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`Informe_Solicitudes_Bold_${fecha}.csv`;a.click();URL.revokeObjectURL(url);
+}
+
+function openNewSolicitud(){
+  const id=Date.now();const now=new Date();
+  const item={id,fecha:`${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`,cc:'Branding',solicita:'Nazareth Ruiz',destinatario:'Nuevo Destinatario',ciudad:'Ciudad',articulo:'Nuevo Artículo',cantidad:1,orden:'',estado:'CARGADO',mes:['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][now.getMonth()]};
+  state.solicitudes.unshift(item);saveDoc('solicitudes',id,item);renderSolicitudesTable();
+}
+
+function downloadCSV(rows,name){const content='\uFEFF'+rows.map(r=>r.join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8;'}));a.download=name;a.click();}
+
+// ════════════════════════════════════════════
+//  INVENTARIO
+// ════════════════════════════════════════════
+function filterInventory(){renderInventoryGrid();}
+function filterInvStatus(v,btn){state.invFilter.status=v;document.querySelectorAll('[onclick*="filterInvStatus"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderInventoryGrid();}
+
+async function renderInventory(){_galeriaLoaded=false;await syncGaleriaFotos();renderInventoryGrid();}
+
+function renderInventoryGrid() {
+  applyFotos();
+  const search=(document.getElementById('searchInv')?.value||'').toLowerCase();
+  const status=state.invFilter.status;
+  const filtered=state.inventory.filter(p=>{
+    const matchS=!search||p.nombre.toLowerCase().includes(search)||(p.ref||'').toLowerCase().includes(search);
+    let matchStatus=true;
+    if(status==='ok') matchStatus=p.cantidad>(p.minimo||0);
+    if(status==='low') matchStatus=p.cantidad>0&&p.cantidad<=(p.minimo||0);
+    if(status==='zero') matchStatus=p.cantidad===0;
+    return matchS&&matchStatus;
+  });
+  const grid=document.getElementById('inventoryGrid');
+  if(!grid) return;
+  grid.innerHTML='';
+  filtered.forEach(p=>{
+    const qty=parseInt(p.cantidad)||0;const min=parseInt(p.minimo)||0;
+    const qtyClass=qty===0?'zero':qty<=min?'low':'ok';
+    const qtyLabel=qty===0?'Agotado':qty<=min?'Stock bajo':'Disponible';
+    const card=document.createElement('div');
+    card.style.cssText='background:white;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,.07);transition:transform .2s,box-shadow .2s;';
+    card.onmouseover=()=>{card.style.transform='translateY(-3px)';card.style.boxShadow='0 8px 24px rgba(18,30,108,.13)';};
+    card.onmouseout=()=>{card.style.transform='';card.style.boxShadow='0 2px 8px rgba(0,0,0,.07)';};
+    if(p.foto){const img=document.createElement('img');img.src=p.foto;img.alt=p.nombre;img.style.cssText='width:100%;height:120px;object-fit:cover;display:block;';card.appendChild(img);}
+    else{const ph=document.createElement('div');ph.style.cssText='width:100%;height:120px;background:#F1F2F6;display:flex;align-items:center;justify-content:center;font-size:2.2rem;';ph.textContent=p.icon||'📦';card.appendChild(ph);}
+    const bar=document.createElement('div');
+    bar.style.cssText='display:flex;align-items:stretch;min-height:32px;background:#121E6C;';
+    const lbl=document.createElement('label');
+    lbl.style.cssText='cursor:pointer;flex:1;color:white;display:flex;align-items:center;justify-content:center;gap:5px;padding:6px 8px;font-size:10px;font-weight:700;font-family:Montserrat,sans-serif;letter-spacing:.3px;';
+    lbl.innerHTML='📷 '+(p.foto?'Cambiar foto':'Subir foto');
+    const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.style.display='none';
+    inp.onchange=e=>uploadInvPhoto(p.id,e.target);lbl.appendChild(inp);bar.appendChild(lbl);
+    if(p.foto){const sep=document.createElement('div');sep.style.cssText='width:1px;background:rgba(255,255,255,.2);margin:5px 0;';bar.appendChild(sep);const del=document.createElement('button');del.style.cssText='background:none;color:rgba(255,255,255,.8);border:none;padding:6px 10px;cursor:pointer;font-size:11px;';del.innerHTML='✕';del.onclick=()=>deleteInvPhoto(p.id);bar.appendChild(del);}
+    card.appendChild(bar);
+    const body=document.createElement('div');body.style.cssText='padding:10px 12px;';
+    const nameEl=document.createElement('div');nameEl.style.cssText='font-family:Oswald,sans-serif;font-size:.8rem;font-weight:700;color:#121E6C;text-transform:uppercase;line-height:1.2;margin-bottom:4px;';nameEl.textContent=p.nombre;body.appendChild(nameEl);
+    const qtyEl=document.createElement('div');qtyEl.style.cssText=`font-family:Oswald,sans-serif;font-size:1.6rem;font-weight:700;color:${qty===0?'#BABDD3':qty<=min?'#854F0B':'#121E6C'};cursor:pointer;`;qtyEl.textContent=fmtN(qty);qtyEl.title='Clic para editar';qtyEl.onclick=()=>editInvQty(p.id,qtyEl);body.appendChild(qtyEl);
+    const labelEl=document.createElement('div');labelEl.style.cssText='font-size:9px;font-weight:700;color:#6C759F;text-transform:uppercase;margin-top:2px;';labelEl.textContent=qtyLabel+' · Branding';body.appendChild(labelEl);
+    card.appendChild(body);grid.appendChild(card);
+  });
+}
+
+function editInvQty(id,el){
+  const item=state.inventory.find(p=>p.id===id);if(!item) return;
+  const input=document.createElement('input');input.type='number';input.value=item.cantidad;input.min=0;
+  input.style.cssText='width:80px;border:2px solid var(--coral);border-radius:6px;padding:4px 8px;font-size:1.2rem;font-weight:800;text-align:center;font-family:var(--font-display);color:var(--blue);outline:none;';
+  el.replaceWith(input);input.focus();
+  input.onblur=async()=>{item.cantidad=parseInt(input.value)||0;await saveDoc('inventory',id,item);renderInventoryGrid();};
+  input.onkeydown=e=>{if(e.key==='Enter') input.blur();};
+}
+
+async function uploadInvPhoto(id,input){
+  const file=input.files[0];if(!file) return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const img=new Image();
+    img.onload=async()=>{
+      const canvas=document.createElement('canvas');const MAX=600;let w=img.width,h=img.height;
+      if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+      canvas.width=w;canvas.height=h;canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const compressed=canvas.toDataURL('image/jpeg',0.8);
+      const item=state.inventory.find(p=>p.id===id);
+      if(item){item.foto=compressed;await saveDoc('inventory',id,item);renderInventoryGrid();if(state.currentView==='kits') renderKits();}
+    };img.src=e.target.result;
+  };reader.readAsDataURL(file);input.value='';
+}
+
+async function deleteInvPhoto(id){
+  const item=state.inventory.find(p=>p.id===id);
+  if(item){item.foto='';await saveDoc('inventory',id,item);renderInventoryGrid();if(state.currentView==='kits') renderKits();}
+}
+
+function openNewProduct(){
+  const id='inv_'+Date.now();const nombre=prompt('Nombre del producto:','NUEVO PRODUCTO');if(!nombre) return;
+  const cantidad=parseInt(prompt('Cantidad inicial:','0'))||0;
+  const item={id,ref:nombre.replace(/\s+/g,'_').toUpperCase(),nombre:nombre.toUpperCase(),cantidad,icon:'📦',categoria:'General',minimo:10};
+  state.inventory.push(item);saveDoc('inventory',id,item);renderInventoryGrid();
+}
+
+// ════════════════════════════════════════════
+//  KITS
+// ════════════════════════════════════════════
+function renderKits(){
+  if(!_galeriaLoaded){syncGaleriaFotos().then(n=>{if(n>0) renderKits();});}
+  applyFotos();
+  const list=document.getElementById('kitProductsList');if(!list) return;list.innerHTML='';
+  state.inventory.filter(p=>p.cantidad>0).forEach(p=>{
+    const selected=state.kitItems[p.id]!==undefined;
+    const item=document.createElement('div');
+    item.style.cssText=`display:flex;flex-direction:column;align-items:center;padding:8px 6px;cursor:pointer;border-radius:10px;border:2px solid ${selected?'#FF2847':'#E2E8F0'};background:${selected?'#FEF5F6':'white'};text-align:center;transition:all .15s;`;
+    item.onclick=()=>toggleKitProduct(p.id);
+    if(p.foto){const img=document.createElement('img');img.src=p.foto;img.style.cssText='width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;';item.appendChild(img);}
+    else{const ph=document.createElement('div');ph.style.cssText='width:100%;height:80px;background:#F1F2F6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin-bottom:6px;';ph.textContent=p.icon||'📦';item.appendChild(ph);}
+    const name=document.createElement('div');name.className='kit-product-name';name.textContent=p.nombre;item.appendChild(name);
+    const stock=document.createElement('div');stock.className='kit-product-stock';stock.textContent=fmtN(p.cantidad)+' disp.';item.appendChild(stock);
+    list.appendChild(item);
+  });
+  const sel=document.getElementById('kitEvent');
+  if(sel){sel.innerHTML='<option value="">Seleccionar evento...</option>'+state.eventos.map(e=>`<option value="${e.id}">${e.nombre} (${e.ciudad})</option>`).join('');}
+  renderKitComposer();renderSavedKits();
+}
+
+function toggleKitProduct(id){if(state.kitItems[id]!==undefined){delete state.kitItems[id];}else{state.kitItems[id]=1;}renderKits();}
+
+function renderKitComposer(){
+  const container=document.getElementById('kitItems');if(!container) return;
+  const keys=Object.keys(state.kitItems);
+  if(keys.length===0){container.innerHTML='<div class="kit-empty">📦 Selecciona productos del panel izquierdo</div>';return;}
+  container.innerHTML=keys.map(k=>{
+    const p=state.inventory.find(i=>i.id===k);if(!p) return '';
+    const thumb=p.foto?`<img src="${p.foto}" style="width:28px;height:28px;object-fit:cover;border-radius:4px;flex-shrink:0;">`:`<span>${p.icon||'📦'}</span>`;
+    return `<div class="kit-slot"><div style="display:flex;align-items:center;gap:8px;flex:1;overflow:hidden;">${thumb}<span class="kit-slot-name">${p.nombre.substring(0,22)}</span></div><div class="kit-slot-qty"><button onclick="changeKitQty('${k}',-1)">−</button><span>${state.kitItems[k]}</span><button onclick="changeKitQty('${k}',1)">+</button><button onclick="removeKitItem('${k}')" style="background:var(--coral);">×</button></div></div>`;
+  }).join('');
+}
+
+function changeKitQty(id,delta){if(state.kitItems[id]!==undefined){state.kitItems[id]=Math.max(1,(state.kitItems[id]||1)+delta);renderKitComposer();}}
+function removeKitItem(id){delete state.kitItems[id];renderKits();}
+
+async function saveKit(){
+  const name=document.getElementById('kitName')?.value?.trim();const eventId=parseInt(document.getElementById('kitEvent')?.value||'0');
+  if(!name){alert('Por favor asigna un nombre al kit.');return;}
+  const keys=Object.keys(state.kitItems);if(keys.length===0){alert('El kit está vacío.');return;}
+  const kit={id:Date.now(),nombre:name,eventoId:eventId,items:keys.map(k=>({productId:k,cantidad:state.kitItems[k]})),fecha:new Date().toLocaleDateString('es-CO'),disponible:true};
+  state.kits.push(kit);state.kitItems={};document.getElementById('kitName').value='';
+  await saveDoc('kits',kit.id,kit);
+  try{localStorage.setItem('bold_kits_backup',JSON.stringify(state.kits));}catch(e){}
+  renderKits();updateAllNavMeta();alert(`✅ Kit "${name}" guardado exitosamente.`);
+}
+
+function renderSavedKits(){
+  const container=document.getElementById('savedKitsGrid');if(!container) return;
+  if(state.kits.length===0){container.innerHTML='<p style="color:var(--blue50);font-size:12px;">Aún no hay kits guardados.</p>';return;}
+  container.innerHTML=state.kits.map(kit=>{
+    const evento=state.eventos.find(e=>e.id===kit.eventoId);
+    const noDisp=kit.disponible===false;
+    const items=(kit.items||[]).map(it=>{const p=state.inventory.find(p=>p.id===it.productId);return p?`${p.icon||'📦'} ${p.nombre.substring(0,20)} x${it.cantidad}`:''}).filter(Boolean).join(', ');
+    return `<div class="table-card" style="margin-bottom:0;opacity:${noDisp?'0.55':'1'};border-left:4px solid ${noDisp?'#BABDD3':'var(--coral)'};">
+      <div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--blue);text-transform:uppercase;">${kit.nombre}</div>
+      <div style="font-size:11px;color:var(--blue50);margin-top:2px;">${evento?evento.nombre:'Sin evento'} · ${kit.fecha}</div>
+      <div style="font-size:11px;color:var(--blue);margin-top:8px;">${items}</div>
+      <div style="display:flex;gap:6px;margin-top:10px;">
+        <button onclick="toggleKitDisponible(${kit.id})" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1.5px solid ${noDisp?'#16a34a':'#BABDD3'};background:none;color:${noDisp?'#16a34a':'#6C759F'};cursor:pointer;font-weight:700;">${noDisp?'✓ Activar':'⊘ No disp.'}</button>
+        <button onclick="deleteKit(${kit.id})" style="font-size:10px;padding:4px 8px;border-radius:6px;border:1.5px solid #FCDFE2;background:none;color:var(--coral);cursor:pointer;font-weight:700;">🗑 Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleKitDisponible(id){const kit=state.kits.find(k=>k.id===id);if(!kit) return;kit.disponible=kit.disponible===false?true:false;await saveDoc('kits',id,kit);renderSavedKits();}
+async function deleteKit(id){if(!confirm('¿Eliminar este kit permanentemente?')) return;state.kits=state.kits.filter(k=>k.id!==id);await deleteDoc('kits',id);renderSavedKits();}
+
+// ════════════════════════════════════════════
+//  PROVEEDORES
+// ════════════════════════════════════════════
+function filterProveedores(){renderProveedoresContainer();}
+function filterProvStatus(v,btn){state.provFilter.status=v;document.querySelectorAll('[onclick*="filterProvStatus"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderProveedoresContainer();}
+
+function renderProveedoresContainer() {
+  const container=document.getElementById('proveedoresContainer');if(!container) return;
+  const search=(document.getElementById('searchProv')?.value||'').toLowerCase();
+  const status=state.provFilter?.status||'all';
+  let filtered=state.proveedores;
+  if(search) filtered=filtered.filter(p=>p.nombre.toLowerCase().includes(search)||(p.descripcion||'').toLowerCase().includes(search));
+  if(status!=='all') filtered=filtered.filter(p=>(p.estado||'').toUpperCase().includes(status.toUpperCase()));
+  if(filtered.length===0){container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--blue50);">Sin resultados</div>';return;}
+  container.innerHTML='';
+  filtered.forEach(prod=>{
+    const cots=(prod.cotizaciones||[]).filter(c=>c.precioUnit||c.total);
+    const statusColor=prod.estado==='SELECCIONADO'?'#16a34a':(prod.estado||'').includes('PENDIENTE')?'#ca8a04':prod.estado==='RECHAZADO'?'#dc2626':'#6C759F';
+    const el=document.createElement('div');el.className='provider-product';el.id='grp_'+prod.id;
+    el.innerHTML=`
+      <div class="provider-product-header" onclick="toggleProvider('grp_${prod.id}')">
+        <div style="width:56px;height:56px;background:var(--blue10);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">📦</div>
+        <div style="flex:1;min-width:0;">
+          <div class="provider-product-name">${prod.nombre}</div>
+          <div style="font-size:11px;color:var(--blue50);margin-top:2px;line-height:1.3;">${(prod.descripcion||'').substring(0,80)}</div>
+          <div style="margin-top:4px;"><span style="font-size:10px;font-weight:700;color:${statusColor};background:${statusColor}18;padding:2px 10px;border-radius:20px;">${prod.estado||'PENDIENTE'}</span></div>
+        </div>
+        <span style="color:var(--blue30);">▼</span>
+      </div>
+      <div class="provider-product-body" id="ppbody_grp_${prod.id}">
+        ${cots.length>0?`<div style="overflow-x:auto;"><table class="providers-table"><thead><tr><th>Proveedor</th><th>Precio Unit.</th><th>Cant.</th><th>Total</th></tr></thead><tbody>${cots.map(c=>`<tr><td>${c.proveedor}</td><td style="font-weight:700;">${c.precioUnit||'—'}</td><td>${c.cantidad>0?fmtN(c.cantidad):'—'}</td><td style="font-weight:800;">${c.total||'—'}</td></tr>`).join('')}</tbody></table></div>`:''}
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+          <button onclick="changeProvStatus(${prod.id},'SELECCIONADO')" style="font-size:10px;padding:4px 10px;border-radius:6px;border:1.5px solid #16a34a;background:none;color:#16a34a;cursor:pointer;font-weight:700;font-family:var(--font-main);">✅ Seleccionar</button>
+          <button onclick="changeProvStatus(${prod.id},'PENDIENTE DE NEGOCIACIÓN')" style="font-size:10px;padding:4px 10px;border-radius:6px;border:1.5px solid #ca8a04;background:none;color:#ca8a04;cursor:pointer;font-weight:700;font-family:var(--font-main);">⏳ Pendiente</button>
+          <button onclick="changeProvStatus(${prod.id},'RECHAZADO')" style="font-size:10px;padding:4px 10px;border-radius:6px;border:1.5px solid #dc2626;background:none;color:#dc2626;cursor:pointer;font-weight:700;font-family:var(--font-main);">✕ Rechazar</button>
+        </div>
+      </div>`;
+    container.appendChild(el);
+  });
+}
+
+function toggleProvider(id){const body=document.getElementById('ppbody_'+id);if(body) body.classList.toggle('open');}
+async function changeProvStatus(id,status){const p=state.proveedores.find(p=>p.id===id);if(p){p.estado=status;renderProveedoresContainer();}}
+
+// ════════════════════════════════════════════
+//  OBJETIVOS
+// ════════════════════════════════════════════
+function renderObjetivos(){
+  const container=document.getElementById('objetivosContent');if(!container) return;
+  const rows=state.objetivosTMK||[];
+  if(rows.length===0){container.innerHTML=`<div style="text-align:center;padding:3rem;color:var(--blue50);"><p style="font-weight:700;color:var(--blue);margin-bottom:6px;">Sin datos aún</p><button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="syncAllSheets(false)">↺ Sincronizar ahora</button></div>`;return;}
+  let currentProyecto='';
+  const data=rows.map(r=>{const p=(r['Proyecto']||r['proyecto']||'').trim();if(p) currentProyecto=p;return{...r,_proyecto:currentProyecto};}).filter(r=>(r['Actividades']||r['actividades']||'').trim());
+  const grupos={};data.forEach(r=>{const p=r._proyecto||'Sin proyecto';if(!grupos[p]) grupos[p]=[];grupos[p].push(r);});
+  function estadoBadge(e){const s=(e||'').toLowerCase().trim();if(s.includes('terminado')) return `<span style="background:#DCFCE7;color:#15803D;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;">✓ Terminado</span>`;if(s.includes('proceso')) return `<span style="background:#DBEAFE;color:#1D4ED8;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;">⟳ En proceso</span>`;if(s.includes('iniciado')) return `<span style="background:#FEF9C3;color:#854D0E;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;">▷ Iniciado</span>`;if(s.includes('sin iniciar')) return `<span style="background:#F1F2F6;color:#6C759F;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;">○ Sin iniciar</span>`;return `<span style="background:#F1F2F6;color:#BABDD3;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;">— Sin estado</span>`;}
+  let html=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.2rem;"><button onclick="filtrarObjetivos('todos',this)" class="filter-chip active">Todos</button><button onclick="filtrarObjetivos('En proceso',this)" class="filter-chip">⟳ En proceso</button><button onclick="filtrarObjetivos('Sin iniciar',this)" class="filter-chip">○ Sin iniciar</button><button onclick="filtrarObjetivos('Terminado',this)" class="filter-chip">✓ Terminados</button><input id="searchObjetivos" placeholder="🔍 Buscar proyecto o actividad..." oninput="filtrarObjetivos('search',null,this.value)" style="border:1.5px solid var(--blue10);border-radius:20px;padding:4px 14px;font-size:11px;font-family:var(--font-main);outline:none;width:220px;"></div><div id="objetivosGrupos">`;
+  Object.entries(grupos).forEach(([proyecto,items],idx)=>{
+    const total=items.length;const terminado=items.filter(r=>(r['Estado']||r['estado']||'').toLowerCase().includes('terminado')).length;
+    const pct=Math.round((terminado/total)*100);const barColor=pct>=100?'#16a34a':pct>=60?'#ca8a04':'#FF2847';
+    html+=`<div class="table-card obj-grupo" style="margin-bottom:12px;" data-proyecto="${proyecto.toLowerCase()}">
+      <div onclick="toggleObjGrupo(${idx})" style="cursor:pointer;display:flex;align-items:center;gap:12px;">
+        <div style="flex:1;min-width:0;"><div style="font-family:var(--font-display);font-size:1rem;font-weight:700;color:var(--blue);text-transform:uppercase;">${proyecto}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;"><div style="flex:1;background:var(--blue10);border-radius:4px;height:7px;max-width:200px;"><div style="width:${pct}%;background:${barColor};height:7px;border-radius:4px;"></div></div><span style="font-size:11px;font-weight:700;color:${barColor};">${pct}%</span><span style="font-size:10px;color:var(--blue50);">${terminado}/${total}</span></div></div>
+        <span id="objChevron${idx}" style="color:var(--blue50);font-size:16px;">▼</span>
+      </div>
+      <div id="objBody${idx}" style="margin-top:12px;">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead><tr style="background:var(--blue10);"><th style="padding:7px 10px;text-align:left;color:var(--blue);font-weight:700;font-size:10px;">Actividad</th><th style="padding:7px 10px;text-align:center;color:var(--blue);font-weight:700;font-size:10px;">Estado</th><th style="padding:7px 10px;text-align:center;color:var(--blue);font-weight:700;font-size:10px;">Responsable</th></tr></thead>
+          <tbody>${items.map((r,ri)=>{const actividad=r['Actividades']||r['actividades']||'';const estado=r['Estado']||r['estado']||'';const responsable=r['Responsable']||r['responsable']||'';const terminated=estado.toLowerCase().includes('terminado');return `<tr style="border-bottom:1px solid var(--blue10);background:${ri%2===0?'white':'#FAFBFF'};"><td style="padding:8px 10px;color:${terminated?'#BABDD3':'var(--blue)'};text-decoration:${terminated?'line-through':'none'};">${actividad}</td><td style="padding:8px 10px;text-align:center;">${estadoBadge(estado)}</td><td style="padding:8px 10px;text-align:center;"><span style="background:var(--blue10);color:var(--blue);font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;">${responsable||'—'}</span></td></tr>`;}).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+  html+='</div>';container.innerHTML=html;
+}
+
+function toggleObjGrupo(idx){const body=document.getElementById(`objBody${idx}`);const chevron=document.getElementById(`objChevron${idx}`);if(!body) return;const open=body.style.display!=='none';body.style.display=open?'none':'';if(chevron) chevron.style.transform=open?'rotate(-90deg)':'';}
+function filtrarObjetivos(tipo,btn,search){
+  if(btn){document.querySelectorAll('#objetivosContent .filter-chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+  const grupos=document.querySelectorAll('.obj-grupo');
+  const q=(search||document.getElementById('searchObjetivos')?.value||'').toLowerCase();
+  grupos.forEach(g=>{const proyecto=g.dataset.proyecto||'';const rows=g.querySelectorAll('tbody tr');let visible=0;rows.forEach(row=>{const texto=row.textContent.toLowerCase();const matchQ=!q||texto.includes(q)||proyecto.includes(q);const matchF=tipo==='todos'||tipo==='search'||texto.includes(tipo.toLowerCase());row.style.display=matchQ&&matchF?'':'none';if(matchQ&&matchF) visible++;});g.style.display=visible>0||(!q&&tipo==='todos')?'':'none';});
+}
+
+// ════════════════════════════════════════════
+//  EVENTOS
+// ════════════════════════════════════════════
+function filterEventos(v,btn){state.eventFilter=v;document.querySelectorAll('[onclick*="filterEventos"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderEventos();}
+
+function renderEventos(){
+  if(state.activeEventId){renderEventoDetail(state.activeEventId);return;}
+  const detail=document.getElementById('eventoDetail');if(detail) detail.style.display='none';
+  const grid=document.getElementById('eventosGrid');if(!grid) return;grid.style.display='';
+  const filtered=state.eventos.filter(e=>state.eventFilter==='all'||e.estado===state.eventFilter);
+  grid.innerHTML=filtered.map(ev=>{
+    const total=eventoTotal(ev);
+    return `<div class="event-card" onclick="openEventoDetail(${ev.id})"><div class="event-card-bar"></div><div class="event-card-body">
+      <div class="event-card-meta"><span class="event-card-month">${ev.mes||''}</span><span class="badge ${ev.estado==='Realizado'?'green':'amber'}">${ev.estado}</span></div>
+      <div class="event-card-title">${ev.nombre}</div>
+      <div class="event-card-info">📍 ${ev.ciudad} · 📅 ${ev.fecha}</div>
+      <div class="event-card-footer"><div><div class="event-card-total-label">Total Invertido</div><div class="event-card-total">${fmt(total)}</div></div><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openEventoDetail(${ev.id})">Ver detalle</button></div>
+    </div></div>`;
+  }).join('');
+}
+
+function openEventoDetail(id){state.activeEventId=id;document.getElementById('eventosGrid').style.display='none';renderEventoDetail(id);}
+function closeEventoDetail(){state.activeEventId=null;document.getElementById('eventoDetail').style.display='none';document.getElementById('eventosGrid').style.display='';renderEventos();}
+
+function renderEventoDetail(id){
+  const ev=state.eventos.find(e=>e.id===id);const detail=document.getElementById('eventoDetail');
+  if(!ev||!detail) return;detail.style.display='block';const m=ev.metricas||{};
+  detail.innerHTML=`
+    <div class="detail-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px;">
+      <button class="btn btn-outline btn-sm" onclick="closeEventoDetail()">← Volver a Eventos</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" style="color:var(--coral);" onclick="deleteEvento(${ev.id})">🗑 Eliminar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveEventoAndBack(${ev.id})">💾 Guardar</button>
+      </div>
+    </div>
+    <div class="detail-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <span class="event-card-month">${ev.mes}</span>
+        <button onclick="toggleEventoStatus(${ev.id})" class="badge ${ev.estado==='Realizado'?'green':'amber'}" style="cursor:pointer;border:none;font-size:12px;padding:6px 14px;">${ev.estado}</button>
+      </div>
+      <div class="page-title" style="margin-bottom:12px;font-size:1.6rem;">${ev.nombre}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;"><span style="background:var(--blue10);padding:8px 14px;border-radius:10px;font-size:13px;">📅 ${ev.fecha}</span><span style="background:var(--blue10);padding:8px 14px;border-radius:10px;font-size:13px;">📍 ${ev.ciudad}</span><span style="background:var(--blue10);padding:8px 14px;border-radius:10px;font-size:13px;">👥 ${ev.equipo}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="section-label">💰 Inversión del Evento</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:1rem;">
+        <div class="metric-box"><div style="font-size:10px;font-weight:700;color:var(--blue50);text-transform:uppercase;margin-bottom:4px;">Costo Real TMK</div><div style="font-size:1.3rem;font-weight:700;font-family:var(--font-display);color:var(--blue);">${fmt(ev.inversion||0)}</div></div>
+        <div class="metric-box"><div style="font-size:10px;font-weight:700;color:var(--blue50);text-transform:uppercase;margin-bottom:4px;">Costo Activación</div><div style="font-size:1.3rem;font-weight:700;font-family:var(--font-display);color:var(--blue);">${fmt(ev.costoActivacion||0)}</div></div>
+        <div class="metric-box blue"><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;margin-bottom:4px;">Total Invertido</div><div style="font-size:1.3rem;font-weight:700;font-family:var(--font-display);color:white;">${fmt(eventoTotal(ev))}</div></div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="section-label">📊 KPIs del Evento</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <div class="metric-box coral"><div style="font-size:10px;font-weight:700;color:var(--blue50);text-transform:uppercase;margin-bottom:4px;">🛒 Ventas Nuevas</div><div style="font-size:1.8rem;font-weight:700;font-family:var(--font-display);color:var(--coral);">${fmtN(m.ventas||0)}</div></div>
+        <div class="metric-box coral"><div style="font-size:10px;font-weight:700;color:var(--blue50);text-transform:uppercase;margin-bottom:4px;">$ TPV Generado</div><div style="font-size:1.8rem;font-weight:700;font-family:var(--font-display);color:var(--coral);">$${fmtN(m.tpv||0)}</div></div>
+        <div class="metric-box blue"><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;margin-bottom:4px;">❤️ TOH</div><div style="font-size:1.8rem;font-weight:700;font-family:var(--font-display);color:white;">${m.toh||0}%</div></div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="section-label">📸 Fotos del Evento</div>
+      <div id="eventoMedia_${ev.id}" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">${renderEventoMediaItems(ev)}</div>
+      <label style="cursor:pointer;background:var(--blue);color:white;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;font-family:var(--font-main);display:inline-flex;align-items:center;gap:6px;">📷 Subir fotos<input type="file" accept="image/*" multiple style="display:none;" onchange="uploadEventoMedia(${ev.id},this,'image')"></label>
+    </div>
+    <div class="detail-section">
+      <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="https://docs.google.com/spreadsheets/d/1r2qVtowtcZg1g80KMMABc1rOx1cMmjXjY0nJee_iVBc/edit?gid=1961082464" target="_blank" style="font-size:11px;font-weight:700;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;padding:4px 12px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">↗ Sheet Eventos TMK</a>
+        <a href="https://drive.google.com/drive/folders/1MAloVfJqdGlw1Xe36PgNWK7oTH4IEyzY" target="_blank" style="font-size:11px;font-weight:700;color:#5c4fa0;background:#f5f3ff;border:1px solid #c4b5fd;padding:4px 12px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">📁 Carpeta Fotos Eventos</a>
+      </div>
+      <div class="section-label">💬 Notas</div>
+      <textarea id="evNotas_${ev.id}" style="width:100%;min-height:100px;border:1.5px solid var(--blue30);border-radius:10px;padding:12px;font-size:13px;font-family:var(--font-main);outline:none;resize:vertical;" placeholder="Agrega comentarios, retroalimentación del equipo..." onchange="updateEvNota(${ev.id},this.value)">${ev.notas||''}</textarea>
+    </div>`;
+}
+
+function renderEventoMediaItems(ev){
+  const media=ev.media||[];
+  if(media.length===0) return '<div style="color:var(--blue50);font-size:12px;padding:8px 0;">Sin fotos aún.</div>';
+  let imgIdx=0;
+  return media.map(function(m,i){
+    if(m.type==='video'){return `<div style="position:relative;width:160px;"><video src="${m.url}" style="width:160px;height:110px;object-fit:cover;border-radius:8px;border:1.5px solid var(--blue10);" controls></video><button onclick="removeEventoMedia(${ev.id},${i})" style="background:#FF2847;color:white;border:none;border-radius:6px;padding:4px 7px;font-size:11px;cursor:pointer;margin-top:4px;display:block;">✕ Quitar</button></div>`;}
+    var capturedIdx=imgIdx++;
+    return `<div style="position:relative;width:160px;"><img src="${m.url}" style="width:160px;height:110px;object-fit:cover;border-radius:8px;border:1.5px solid var(--blue10);cursor:pointer;display:block;" onclick="openMediaLightbox(${ev.id},${capturedIdx})"><button onclick="removeEventoMedia(${ev.id},${i})" style="background:#FF2847;color:white;border:none;border-radius:6px;padding:4px 7px;font-size:11px;cursor:pointer;margin-top:4px;display:block;">✕ Quitar</button></div>`;
+  }).join('');
+}
+
+async function uploadEventoMedia(id,input,type){
+  const ev=state.eventos.find(e=>e.id===id);if(!ev) return;if(!ev.media) ev.media=[];
+  const files=Array.from(input.files);if(!files.length) return;
+  for(const file of files){
+    try{
+      if(window.storage){const path=`eventos/${id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'')}`;const ref=window.storage.ref(path);const snap=await ref.put(file);const url=await snap.ref.getDownloadURL();ev.media.push({type,url,name:file.name,path});}
+      else{const dataUrl=await new Promise((res,rej)=>{const reader=new FileReader();reader.onload=e=>res(e.target.result);reader.onerror=rej;reader.readAsDataURL(file);});ev.media.push({type:type==='image'?'image':'video',url:dataUrl,name:file.name});}
+    }catch(err){console.error('Upload error:',err);}
+  }
+  await saveDoc('eventos',id,ev);input.value='';renderEventoDetail(id);
+}
+
+async function removeEventoMedia(id,idx){
+  const ev=state.eventos.find(e=>e.id===id);if(!ev||!ev.media) return;
+  if(!confirm('¿Eliminar este archivo?')) return;
+  const item=ev.media[idx];
+  if(item?.path&&window.storage){try{await window.storage.ref(item.path).delete();}catch(e){}}
+  ev.media.splice(idx,1);await saveDoc('eventos',id,ev);renderEventoDetail(id);
+}
+
+function openMediaLightbox(evId,startImgIdx){
+  const ev=state.eventos.find(e=>e.id===evId);if(!ev) return;
+  const images=(ev.media||[]).filter(m=>m.type!=='video');if(!images.length) return;
+  var cur=Math.max(0,Math.min(startImgIdx||0,images.length-1));
+  var old=document.getElementById('_boldLightbox');if(old) old.remove();
+  var ov=document.createElement('div');ov.id='_boldLightbox';ov.style.cssText='position:fixed;inset:0;background:rgba(10,16,60,.95);z-index:9999;display:flex;align-items:center;justify-content:center;';document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov) closeLightbox();});
+  function closeLightbox(){ov.remove();document.removeEventListener('keydown',onKey);}
+  var imgEl=document.createElement('img');imgEl.style.cssText='max-width:90vw;max-height:80vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);display:block;transition:opacity .18s;object-fit:contain;';imgEl.src=images[cur].url;ov.appendChild(imgEl);
+  var closeBtn=document.createElement('button');closeBtn.innerHTML='✕';closeBtn.style.cssText='position:fixed;top:20px;right:24px;background:#FF2847;color:white;border:none;border-radius:50%;width:38px;height:38px;font-size:16px;cursor:pointer;z-index:10000;';closeBtn.onclick=closeLightbox;ov.appendChild(closeBtn);
+  var counter=document.createElement('div');counter.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(18,30,108,.7);color:white;padding:6px 18px;border-radius:20px;font-size:13px;font-weight:700;z-index:10000;';counter.textContent=(cur+1)+' / '+images.length;ov.appendChild(counter);
+  function updateImg(newIdx){newIdx=Math.max(0,Math.min(newIdx,images.length-1));if(newIdx===cur) return;imgEl.style.opacity='0';setTimeout(function(){cur=newIdx;imgEl.src=images[cur].url;imgEl.style.opacity='1';counter.textContent=(cur+1)+' / '+images.length;},180);}
+  if(images.length>1){var prevBtn=document.createElement('button');prevBtn.innerHTML='←';prevBtn.style.cssText='position:fixed;left:20px;top:50%;transform:translateY(-50%);background:rgba(18,30,108,.55);color:white;border:none;border-radius:50%;width:48px;height:48px;font-size:22px;cursor:pointer;z-index:10000;';prevBtn.onclick=function(){updateImg(cur-1);};ov.appendChild(prevBtn);var nextBtn=document.createElement('button');nextBtn.innerHTML='→';nextBtn.style.cssText='position:fixed;right:20px;top:50%;transform:translateY(-50%);background:rgba(18,30,108,.55);color:white;border:none;border-radius:50%;width:48px;height:48px;font-size:22px;cursor:pointer;z-index:10000;';nextBtn.onclick=function(){updateImg(cur+1);};ov.appendChild(nextBtn);}
+  function onKey(e){if(e.key==='ArrowLeft') updateImg(cur-1);if(e.key==='ArrowRight') updateImg(cur+1);if(e.key==='Escape') closeLightbox();}document.addEventListener('keydown',onKey);
+}
+
+async function toggleEventoStatus(id){const ev=state.eventos.find(e=>e.id===id);if(ev){ev.estado=ev.estado==='Realizado'?'Pendiente':'Realizado';await saveDoc('eventos',id,ev);renderEventoDetail(id);}}
+async function saveEventoAndBack(id){const ev=state.eventos.find(e=>e.id===id);if(ev) await saveDoc('eventos',id,ev);closeEventoDetail();}
+async function deleteEvento(id){if(!confirm('¿Eliminar este evento permanentemente?')) return;state.eventos=state.eventos.filter(e=>e.id!==id);await deleteDoc('eventos',id);closeEventoDetail();}
+async function addEvento(){const id=Date.now();const ev={id,mes:'Nuevo Mes',nombre:'Nuevo Evento',ciudad:'Ciudad',fecha:'Fecha por definir',equipo:'TMK',estado:'Pendiente',inversion:0,costoActivacion:0,popAdquirido:0,gastos:[],metricas:{seguidores:0,vistas:0,ventas:0,tpv:0,menciones:0,toh:0},kitsAsignados:[],notas:''};state.eventos.unshift(ev);await saveDoc('eventos',id,ev);openEventoDetail(id);}
+function exportCSVEventos(){const rows=[['ID','Mes','Nombre','Ciudad','Fecha','Equipo','Estado','Inversión']];state.eventos.forEach(e=>{rows.push([e.id,e.mes,`"${e.nombre}"`,e.ciudad,`"${e.fecha}"`,e.equipo,e.estado,e.inversion]);});downloadCSV(rows,'eventos_bold_2026.csv');}
+async function updateEvNota(id,value){const ev=state.eventos.find(e=>e.id===id);if(ev){ev.notas=value;await saveDoc('eventos',id,ev);}}
+
+// ════════════════════════════════════════════
+//  AI ASSISTANT
+// ════════════════════════════════════════════
+let aiHistory=[],aiFileContext=null,aiUserName=null;
+function toggleAI(){const panel=document.getElementById('aiPanel');panel.classList.toggle('open');}
+function openApiModal(){document.getElementById('apiModal').classList.add('open');document.getElementById('apiKeyInput').value=localStorage.getItem('bold_anthropic_key')||'';}
+function closeApiModal(){document.getElementById('apiModal').classList.remove('open');}
+function saveApiKey(){const k=document.getElementById('apiKeyInput').value.trim();if(!k){alert('Ingresa una clave válida.');return;}localStorage.setItem('bold_anthropic_key',k);closeApiModal();addAIMsg('ai','✅ Conexión establecida. Estoy lista para apoyarte en cualquier consulta sobre inventario, solicitudes o eventos.');}
+function addAIMsg(role,text){const msgs=document.getElementById('aiMessages');const div=document.createElement('div');div.className=`ai-msg ${role}`;div.textContent=text;msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;}
+
+const NOT_NAMES=new Set(['hola','holi','buenas','buenos','hey','hi','hello','ok','bien','gracias','si','no','claro','listo','perfecto','genial','dale','como','que','cual','quien','donde','cuando','cuanto']);
+function extractNameFromMessage(text){const cleaned=text.trim();const patterns=[/(?:soy|me llamo|mi nombre es|me dicen)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/i,/^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)[\s!.,]*$/];for(const re of patterns){const m=cleaned.match(re);if(m){const firstName=m[1].split(' ')[0];if(!NOT_NAMES.has(firstName.toLowerCase())) return firstName;}}return null;}
+
+async function sendAI(){
+  const inp=document.getElementById('aiInput');const text=inp.value.trim();if(!text) return;inp.value='';addAIMsg('user',text);aiHistory.push({role:'user',text});
+  if(!aiUserName) aiUserName=localStorage.getItem('bold_ai_username')||null;
+  if(!aiUserName){const detectedName=extractNameFromMessage(text);if(detectedName){aiUserName=detectedName;localStorage.setItem('bold_ai_username',aiUserName);addAIMsg('ai',`Mucho gusto, ${aiUserName}. Soy el asistente corporativo de Bold Branding. Tengo acceso al inventario, solicitudes, eventos y proveedores. ¿En qué puedo apoyarte?`);return;}}
+  const key=localStorage.getItem('bold_anthropic_key');
+  if(!key){openApiModal();addAIMsg('ai','🔑 Para activar el asistente, haz clic en "Conectar IA" e ingresa tu API Key de Anthropic.');return;}
+  document.getElementById('aiSendBtn').disabled=true;
+  const loadEl=document.createElement('div');loadEl.className='ai-msg ai loading';loadEl.textContent='Analizando...';document.getElementById('aiMessages').appendChild(loadEl);document.getElementById('aiMessages').scrollTop=99999;
+  const ctx=JSON.stringify({solicitudes_branding:state.solicitudes.length,inventario:state.inventory.slice(0,20).map(p=>({nombre:p.nombre,cantidad:p.cantidad})),eventos:state.eventos.map(e=>({nombre:e.nombre,estado:e.estado,ciudad:e.ciudad})),kits_guardados:state.kits.length,fileContext:aiFileContext?aiFileContext.substring(0,500):null});
+  const nameRef=aiUserName||'el usuario';
+  const sysPrompt=`Eres el asistente corporativo de Bold Branding Colombia, especializado en gestión de materiales POP, inventario, eventos y proveedores. Tu nombre es "Mago Bold". Estás hablando con ${nameRef}. Tono: corporativo, empoderador, preciso. Español colombiano. Datos del sistema: ${ctx}`;
+  try{
+    const response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,system:sysPrompt,messages:[{role:'user',content:text}]})});
+    if(!response.ok){const errData=await response.json().catch(()=>({}));if(response.status===401){localStorage.removeItem('bold_anthropic_key');loadEl.remove();addAIMsg('ai','🔑 API Key inválida. Por favor reconfigúrala en "Conectar IA".');openApiModal();return;}throw new Error(errData?.error?.message||`HTTP ${response.status}`);}
+    const data=await response.json();const reply=data.content?.[0]?.text||'No se generó respuesta.';loadEl.remove();addAIMsg('ai',reply);aiHistory.push({role:'ai',text:reply});
+  }catch(e){loadEl.remove();if(e.message.includes('fetch')||e.message.includes('Failed')){addAIMsg('ai','🌐 Error de conexión. Abre el archivo desde un servidor web (no file://) para que la IA funcione correctamente.');}else{addAIMsg('ai',`⚠️ ${e.message}`);}}
+  finally{document.getElementById('aiSendBtn').disabled=false;}
+}
+
+function handleAIFile(event){const file=event.target.files[0];if(!file) return;addAIMsg('user',`📎 Archivo adjunto: ${file.name}`);const reader=new FileReader();reader.onload=e=>{aiFileContext=file.type.startsWith('image/')?`[Imagen: ${file.name}]`:e.target.result.substring(0,3000);addAIMsg('ai',`Documento "${file.name}" recibido y analizado. ¿Deseas que lo incorpore al análisis del inventario o eventos?`);};if(file.type.startsWith('image/')) reader.readAsDataURL(file);else reader.readAsText(file);}
+
+// ════════════════════════════════════════════
+//  NAV META BADGES
+// ════════════════════════════════════════════
+function setNavMeta(id,text,type=''){const el=document.getElementById('meta-'+id);if(!el) return;el.textContent=text||'';el.className='nav-meta'+(type?' '+type:'')+(!text?' empty':'');}
+
+function updateAllNavMeta(){
+  const total=state.solicitudes.length+state.inventory.filter(i=>i.cantidad>0).length+state.eventos.length+state.kits.length;
+  setNavMeta('dashboard',total>0?total.toLocaleString('es-CO'):'','ok');
+  const sol=state.solicitudes.length;const solPend=state.solicitudes.filter(s=>['PENDIENTE ALISTAMIENTO','POR PROGRAMAR','TRANSITO NACIONAL','DISTRIBUCIÓN'].includes((s.estado||'').toUpperCase())).length;
+  if(sol>0){if(solPend>0) setNavMeta('solicitudes',solPend+' activas','warn');else setNavMeta('solicitudes',sol.toLocaleString('es-CO'),'ok');}
+  const invTotal=state.inventory.length;const invConFoto=state.inventory.filter(i=>i.foto&&i.foto.length>5).length;
+  if(invTotal>0) setNavMeta('inventario',invConFoto>0?invConFoto+'📷':invTotal+' refs','ok');
+  const kitsDisp=state.kits.filter(k=>k.disponible!==false).length;const kitsTotal=state.kits.length;
+  if(kitsTotal>0) setNavMeta('kits',kitsDisp+'/'+kitsTotal,kitsDisp===0?'warn':'ok');
+  const provSel=state.proveedores.filter(p=>p.estado==='SELECCIONADO').length;const provPend=state.proveedores.filter(p=>(p.estado||'').includes('PENDIENTE')).length;
+  if(state.proveedores.length>0){if(provPend>0) setNavMeta('proveedores',provPend+' pend.','warn');else setNavMeta('proveedores',provSel+' sel.','ok');}
+  const evReal=state.eventos.filter(e=>e.estado==='Realizado').length;const evTotal=state.eventos.length;
+  if(evTotal>0) setNavMeta('eventos',evReal+'/'+evTotal,evReal<evTotal?'warn':'ok');
+  const objAll=state.objetivosTMK||[];const objDone=objAll.filter(r=>(r['Estado']||'').toLowerCase().includes('terminado')).length;
+  if(objAll.length>0){const pct=Math.round((objDone/objAll.length)*100);setNavMeta('objetivos',pct+'%',pct>=80?'ok':pct>=50?'warn':'error');}
+}
+
+// ════════════════════════════════════════════
+//  OC MODAL
+// ════════════════════════════════════════════
+const OC_DATA={
+  pop:{title:'Desglose POP Adquirido sin IVA',sub:'16 registros · Material POP + Branding físico + Evento',gradient:'linear-gradient(135deg,#FF2847 0%,#c91f38 100%)',accentColor:'#FF2847',total:192551985,icon:'📦',rows:[{oc:'POC05413',evento:'POP General',descripcion:'Aviso Trabaja con Nosotros OPC. Cadenilla',proveedor:'Dígitos y Diseños',cant:'100 un.',total:897200},{oc:'POC05419',evento:'POP General',descripcion:'Parasol con estructura metálica acerada 8 puntas',proveedor:'Paraguas y Sombrillas',cant:'9 un.',total:8055000},{oc:'POC05535',evento:'Vuelta atlética San Andrés',descripcion:'Abanicos para el patrocinio',proveedor:'Dígitos y Diseños',cant:'3.000 un.',total:2121000},{oc:'POC05537',evento:'Vuelta atlética San Andrés',descripcion:'Volantes patrocinio Vuelta Atlética',proveedor:'Dígitos y Diseños',cant:'1 servicio',total:555000},{oc:'POC05570',evento:'POP General',descripcion:'Trípticos 115 gr',proveedor:'Dígitos y Diseños',cant:'50.000 un.',total:7700000},{oc:'POC05588',evento:'POP General',descripcion:'Bolsa plana semi impermeable manija 55cm',proveedor:'Bolsa Vida S.A.S.',cant:'5.000 un.',total:38750000},{oc:'POC05651',evento:'POP General',descripcion:'Abierto y Cerrado',proveedor:'Dígitos y Diseños',cant:'16.900 un.',total:96820100},{oc:'POC05654',evento:'POP General',descripcion:'Galaxy Tab A11+ WIFI + Adaptador + Samsung Galaxy A36 5G',proveedor:'Netcom Wireless S.A.S.',cant:'1 kit',total:2469485},{oc:'POC05656',evento:'POP General',descripcion:'Agenda tapa dura con lomo · propalcote 150gr',proveedor:'Gráficas Ibáñez S.A.S.',cant:'400 un.',total:5912400},{oc:'POC05662',evento:'POP General',descripcion:'Crispetera 9x14cm + Vasos ecológicos marcados',proveedor:'Dígitos y Diseños',cant:'6.000 un.',total:3633000},{oc:'POC05663',evento:'POP General',descripcion:'Bolígrafo Roller Santorini marcado 1 tinta',proveedor:'Dígitos y Diseños',cant:'400 un.',total:1104800},{oc:'POC05672',evento:'POP General',descripcion:'Pasacuentas',proveedor:'Incamaru Digital Ltda.',cant:'1.800 un.',total:16200000},{oc:'POC05862',evento:'POP General',descripcion:'Habladores entrega en un solo punto',proveedor:'Gráficas Ibáñez S.A.S.',cant:'9.000 un.',total:5319000},{oc:'POC05864',evento:'POP General',descripcion:'Extensión eléctrica industrial 5 metros naranja',proveedor:'Comercializadora Polux',cant:'1 un.',total:35000},{oc:'POC05356',evento:'Cali – Stand',descripcion:'Stand y pendón para evento en Cali con transporte',proveedor:'Mas Imagen',cant:'1 servicio',total:1720000},{oc:'POC05386',evento:'Branding Genérico',descripcion:'Counter plástico desarmable + portapendón + transporte',proveedor:'Mas Imagen',cant:'1 servicio',total:1260000}]},
+  activaciones:{title:'Desglose Activaciones sin IVA',sub:'10 órdenes · OCs Drive + Activaciones de evento',gradient:'linear-gradient(135deg,#121E6C 0%,#1a2878 100%)',accentColor:'#121E6C',total:64898531,icon:'⚡',rows:[{oc:'POC05561',evento:'Feria EVA',descripcion:'Spot de fotos 360°',proveedor:'Mas Imagen',cant:'1 un.',total:24965000},{oc:'POC05598',evento:'Feria EVA',descripcion:'Publicidad y propaganda · Branding 3×3 banner full color',proveedor:'Mas Imagen',cant:'1 servicio',total:6535000},{oc:'POC05625',evento:'Feria EVA',descripcion:'Branding 3×3 m impresión en banner full color',proveedor:'Mas Imagen',cant:'1 servicio',total:6535000},{oc:'POC05664',evento:'Feria EVA',descripcion:'Programa video dinámico para capturar experiencia del usuario',proveedor:'Mas Imagen',cant:'1 servicio',total:6480000},{oc:'POC05707',evento:'Feria EVA',descripcion:'8 personal mercaderista Bogotá / Manipulación Crispetera',proveedor:'PYP Medios SAS',cant:'8 servicios',total:1828571},{oc:'POC05752',evento:'Mercado Madres Oviedo',descripcion:'Moqueta 2×2 azul + forrado cubos + instalación CC Oviedo',proveedor:'Visual Publicidad',cant:'1 servicio',total:1025000},{oc:'POC05754',evento:'Mercado Madres Oviedo',descripcion:'Alquiler Chiisco Booth × día servicio 8 horas',proveedor:'Chiisco SAS',cant:'1 servicio',total:2350000},{oc:'POC05918',evento:'Anglo Fest',descripcion:'Transporte Anglo Fest · Recogida y entrega Fulppi',proveedor:'Mas Imagen',cant:'1 servicio',total:430000},{oc:'POC05565',evento:'Activación Bundle Hubs',descripcion:'Servicio de activación de marca · Caravana nacional pativalla + POP Man',proveedor:'P&P Medios SAS',cant:'1 servicio',total:12499000},{oc:'POC05755',evento:'Brandeo Carritos Mastercard',descripcion:'Brandeo 2 carritos · plóter de corte Bold + montaje',proveedor:'Mas Imagen',cant:'Completo',total:2250960}]},
+  patrocinios:{title:'Desglose Patrocinios sin IVA',sub:'3 registros · Patrocinios de evento',gradient:'linear-gradient(135deg,#1e7c4a 0%,#145c35 100%)',accentColor:'#1e7c4a',total:120000000,icon:'⭐',rows:[{oc:'POC05622',evento:'Mercado de Madres Oviedo',descripcion:'Patrocinio de exclusividad CC Oviedo',proveedor:'Mercados Gastronómicos S.A.S.',cant:'1 servicio',total:70000000},{oc:'POC05980',evento:'Santander Fashion Week',descripcion:'Patrocinio Santander Fashion Week',proveedor:'Santander BGA Fashion Week S.A.S.',cant:'1 servicio',total:45000000},{oc:'POC05745',evento:'Vuelta atlética San Andrés',descripcion:'Contrato patrocinio XVII edición Vuelta Atlética',proveedor:'Asoc. Atletismo Máster Club Olimpus',cant:'1 servicio',total:5000000}]},
+  envios:{title:'Desglose Envíos sin IVA',sub:'5 registros · Servicios de transporte y envío',gradient:'linear-gradient(135deg,#5c4fa0 0%,#3a2f7a 100%)',accentColor:'#5c4fa0',total:5158208,icon:'🚚',rows:[{oc:'POC05883',evento:'Envíos nacionales mar–may 2026',descripcion:'Envíos a nivel nacional · mensajería expresa y paqueteos',proveedor:'23 MYM S.A.S.',cant:'1 servicio',total:1303662},{oc:'POC05787',evento:'Envío POP nivel nacional',descripcion:'Servicio de envío a 14 puntos nacional · Plegables + Pereira',proveedor:'Dígitos y Diseños',cant:'1 servicio',total:2067864},{oc:'POC05918',evento:'Anglo Fest',descripcion:'Transporte Anglo Fest: recogida y entrega + bodega',proveedor:'Mas Imagen Producción',cant:'2 servicios',total:430000},{oc:'POC05581',evento:'Envío pendones',descripcion:'Envío, recogida y entrega de pendones',proveedor:'23 MYM S.A.S.',cant:'1 servicio',total:76682},{oc:'FAC-151',evento:'Vuelta atlética San Andrés',descripcion:'Transporte de carga urgente Santa Marta – San Andrés',proveedor:'Aviacargo Express SAS',cant:'8 servicios',total:1280000}]}
+};
+
+function fmtCOP(n){return '$'+Math.round(n).toLocaleString('es-CO');}
+
+function openOCModal(type){
+  const d=OC_DATA[type];const modal=document.getElementById('ocModal');
+  document.getElementById('ocModalIcon').style.background=d.gradient;document.getElementById('ocModalIcon').innerHTML=d.icon||'📦';
+  document.getElementById('ocModalTitle').textContent=d.title;document.getElementById('ocModalSub').textContent=d.sub;
+  const thStyle=`padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.9);white-space:nowrap;`;
+  document.getElementById('ocModalThead').innerHTML=`<tr style="background:${d.gradient};"><th style="${thStyle}">Nº OC</th><th style="${thStyle}">Evento</th><th style="${thStyle}">Descripción</th><th style="${thStyle}">Proveedor</th><th style="${thStyle}text-align:right;">Cantidad</th><th style="${thStyle}text-align:right;">Total sin IVA</th></tr>`;
+  const tdBase=`padding:10px 12px;vertical-align:top;border-bottom:1px solid #f0f2f9;font-size:12px;color:#2d3560;`;
+  document.getElementById('ocModalTbody').innerHTML=d.rows.map((r,i)=>`<tr style="background:${i%2===0?'#fff':'#fafbff'};"><td style="${tdBase}font-weight:700;font-family:monospace;font-size:11px;color:${d.accentColor};white-space:nowrap;">${r.oc}</td><td style="${tdBase}white-space:nowrap;">${r.evento}</td><td style="${tdBase}max-width:240px;">${r.descripcion}</td><td style="${tdBase}white-space:nowrap;color:var(--blue50);">${r.proveedor}</td><td style="${tdBase}text-align:right;white-space:nowrap;">${r.cant}</td><td style="${tdBase}text-align:right;font-weight:700;white-space:nowrap;">${fmtCOP(r.total)}</td></tr>`).join('');
+  document.getElementById('ocModalTfoot').innerHTML=`<tr style="background:${d.gradient};"><td colspan="5" style="padding:12px 16px;font-size:12px;font-weight:700;color:rgba(255,255,255,.9);">TOTAL SIN IVA</td><td style="padding:12px 16px;text-align:right;font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:#fff;white-space:nowrap;">${fmtCOP(d.total)}</td></tr>`;
+  // Drive folder links por categoría
+  const driveLinksMap = {
+    pop:          [{label:'📁 Carpeta OC POP', id:DRIVE_FOLDERS.pop}],
+    activaciones: [{label:'📁 Activaciones Nac.', id:DRIVE_FOLDERS.activaciones1},{label:'📁 Bundle Hubs', id:DRIVE_FOLDERS.activaciones2},{label:'📁 Otros', id:DRIVE_FOLDERS.activaciones3}],
+    patrocinios:  [{label:'📁 Carpeta Patrocinios', id:DRIVE_FOLDERS.eventosFotos}],
+    envios:       [{label:'📁 Carpeta POP', id:DRIVE_FOLDERS.pop}],
+  };
+  const links = driveLinksMap[type]||[];
+  const driveEl = document.getElementById('ocDriveLinks');
+  if(driveEl) driveEl.innerHTML = links.map(l=>`<a href="${driveFolder(l.id)}" target="_blank" style="font-size:10px;font-weight:700;color:var(--blue);text-decoration:none;background:var(--blue10);padding:3px 10px;border-radius:20px;white-space:nowrap;">${l.label} ↗</a>`).join(' ');
+  modal.classList.add('open');
+}
+function closeOCModal(){document.getElementById('ocModal').classList.remove('open');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape') closeOCModal();});
+
+// ════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════
+(function(){
+  try{if(localStorage.getItem('sidebarMini')==='1'){const s=document.getElementById('sidebar');if(s) s.classList.add('mini');}}catch(e){}
+  if(window.innerWidth<=900){const toggle=document.querySelector('.sidebar-toggle');if(toggle) toggle.style.display='flex';}
+})();
+
+window.addEventListener('DOMContentLoaded',()=>{initFirebase();});
+</script>
+</body>
+</html>
