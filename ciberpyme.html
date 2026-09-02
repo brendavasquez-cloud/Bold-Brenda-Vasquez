@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiberPyme 360 - Dashboard Interactivo</title>
+    <!-- Librería para gráficos interactivos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0f172a; 
+            --bg-card: #1e293b; 
+            --bg-sidebar: #0f172a;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-orange: #f97316;
+            --accent-blue: #3b82f6;
+            --risk-critical: #ef4444;
+            --risk-high: #f97316;
+            --risk-medium: #eab308;
+            --risk-low: #10b981;
+            --border-color: #334155;
+            --hover-bg: rgba(59, 130, 246, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- MENÚ LATERAL --- */
+        .sidebar {
+            width: 260px;
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid #1e293b;
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem 0;
+            z-index: 10;
+        }
+
+        .brand {
+            font-size: 1.2rem;
+            font-weight: 800;
+            padding: 0 1.5rem 2rem 1.5rem;
+            color: var(--accent-orange);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: 0.5px;
+        }
+        
+        .brand span {
+            color: var(--text-light);
+        }
+
+        .nav-list { list-style: none; }
+
+        .nav-item {
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+            font-size: 0.95rem;
+        }
+
+        .nav-item:hover {
+            color: var(--text-light);
+        }
+
+        .nav-item.active {
+            background-color: #1e293b;
+            color: var(--text-light);
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        /* --- CONTENIDO PRINCIPAL --- */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 2rem 2.5rem;
+            background-color: #0b1120;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .top-bar h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--text-light);
+        }
+        .top-bar h1 span {
+            color: var(--text-muted);
+            font-size: 1.3rem;
+            margin-left: 10px;
+            font-weight: 400;
+        }
+
+        /* Pestañas funcionales */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- COMPONENTES GLOBALES --- */
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-header {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1.5rem;
+            color: var(--text-light);
+        }
+
+        /* Tablas */
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 1.2rem 1rem; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; }
+        th { color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; font-weight: 700; border-bottom: 2px solid var(--border-color); padding-top: 0; }
+        tr:last-child td { border-bottom: none; }
+        
+        /* Badges / Pills */
+        .badge { padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.5px; }
+        .badge-critical { background-color: rgba(239, 68, 68, 0.15); color: var(--risk-critical); }
+        .badge-high { background-color: rgba(249, 115, 22, 0.15); color: var(--risk-high); }
+        .badge-medium { background-color: rgba(234, 179, 8, 0.15); color: var(--risk-medium); }
+        .badge-low { background-color: rgba(16, 185, 129, 0.15); color: var(--risk-low); }
+
+        /* --- DISEÑO ESPECÍFICO: DASHBOARD --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .chart-container { position: relative; height: 180px; width: 100%; }
+        
+        .score-overlay {
+            position: absolute; top: 60%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center; pointer-events: none;
+        }
+
+        .flowchart {
+            display: flex; flex-wrap: wrap; gap: 10px;
+            justify-content: center; align-items: center; margin-bottom: 1.5rem;
+        }
+        .flow-step {
+            background-color: transparent;
+            border: 1px solid var(--accent-blue);
+            color: var(--text-light);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+        .flow-step.active {
+            background-color: var(--accent-orange);
+            border-color: var(--accent-orange);
+            font-weight: 700;
+        }
+        .flow-arrow { color: var(--accent-blue); font-weight: bold; }
+        .flow-arrow.active { color: var(--accent-orange); }
+
+        .value-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .value-box {
+            background-color: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+            padding: 1rem; border-radius: 6px;
+        }
+        .value-box h4 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+        .value-box p { font-size: 0.8rem; color: var(--text-muted); }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+        .dot-green { background-color: #10b981; }
+        .dot-yellow { background-color: #eab308; }
+
+        .timeline { border-left: 2px solid var(--border-color); padding-left: 1.5rem; margin-top: 1rem; }
+        .timeline-item { position: relative; margin-bottom: 1.5rem; }
+        .timeline-item::before {
+            content: ''; position: absolute; left: -1.88rem; top: 2px; width: 12px; height: 12px;
+            border-radius: 50%; background-color: var(--bg-card); border: 2px solid var(--accent-blue);
+        }
+
+        /* --- DISEÑO ESPECÍFICO: INCIDENTES --- */
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 1.5rem; }
+        .metric-card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; }
+        .metric-title { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .metric-value { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.2rem; }
+
+        /* --- DISEÑO ESPECÍFICO: MAPA DE RIESGOS --- */
+        .map-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.5rem; }
+        .map-grid-bottom { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.5rem; }
+        .border-card {
+            background-color: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 1.5rem;
+            border-left-width: 4px;
+        }
+        .border-card h4 { font-size: 1rem; margin-bottom: 0.5rem; color: var(--text-light); }
+        .border-card p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
+        
+        /* --- DISEÑO ESPECÍFICO: PLANES --- */
+        .pricing-header { text-align: center; margin-bottom: 2.5rem; margin-top: 1rem; }
+        .pricing-header h2 { font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem; }
+        .pricing-header p { color: var(--text-muted); }
+        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; max-width: 1000px; margin: 0 auto; }
+        
+        .plan-card {
+            background-color: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 2.5rem 2rem; position: relative;
+        }
+        .plan-card.popular { border: 2px solid var(--accent-blue); background-color: rgba(59, 130, 246, 0.05); }
+        .plan-badge {
+            position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            background-color: var(--accent-blue); color: white; padding: 0.2rem 1rem;
+            border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+        }
+        .plan-title { color: var(--accent-blue); font-size: 1.2rem; font-weight: 700; text-align: center; margin-bottom: 1rem; }
+        .plan-price { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 2rem; }
+        .plan-price span { font-size: 1rem; font-weight: 400; color: var(--text-muted); }
+        
+        .plan-features { list-style: none; margin-bottom: 2.5rem; }
+        .plan-features li { margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted); display: flex; align-items: flex-start; gap: 10px; }
+        .plan-features li::before { content: "✓"; color: var(--risk-low); font-weight: 800; }
+        
+        .btn {
+            width: 100%; padding: 0.8rem; border-radius: 6px; font-weight: 600; font-size: 0.9rem;
+            cursor: pointer; transition: all 0.2s; text-align: center; border: none;
+        }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-light); }
+        .btn-outline:hover { background-color: rgba(255,255,255,0.05); }
+        .btn-primary { background-color: var(--accent-blue); color: white; }
+        .btn-primary:hover { background-color: #2563eb; }
+
+    </style>
+</head>
+<body>
+
+    <!-- MENÚ LATERAL -->
+    <aside class="sidebar">
+        <div class="brand">🛡️ CIBERPYME <span>360</span></div>
+        <ul class="nav-list">
+            <li class="nav-item active" onclick="switchTab('dashboard', this)">Dashboard</li>
+            <li class="nav-item" onclick="switchTab('vulnerabilidades', this)">Vulnerabilidades</li>
+            <li class="nav-item" onclick="switchTab('incidentes', this)">Incidentes</li>
+            <li class="nav-item" onclick="switchTab('mapa', this)">Mapa de Riesgos</li>
+            <li class="nav-item" onclick="switchTab('informes', this)">Informes</li>
+            <li class="nav-item" onclick="switchTab('configuracion', this)">Configuración (Planes)</li>
+        </ul>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+        <div class="top-bar">
+            <h1 id="page-title">Panel de Control <span>| ACA 1 Idea de Negocio</span></h1>
+        </div>
+
+        <!-- ================= SECCIÓN 1: DASHBOARD ================= -->
+        <section id="dashboard" class="content-section active">
+            <div class="dashboard-grid">
+                
+                <!-- Medidor -->
+                <div class="card">
+                    <div class="card-header">SCORE DE EXPOSICIÓN GLOBAL</div>
+                    <div class="chart-container">
+                        <canvas id="gaugeChart"></canvas>
+                        <div class="score-overlay">
+                            <div style="font-size: 3.5rem; font-weight: 800; line-height: 1;">78<span style="font-size:1.5rem; color:var(--text-muted); font-weight: 400;">/100</span></div>
+                            <div style="color: var(--risk-medium); font-weight: 800; font-size: 0.85rem; letter-spacing: 0.5px; margin-top: 5px;">RIESGO MEDIO</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Barras -->
+                <div class="card">
+                    <div class="card-header">DISTRIBUCIÓN DE VULNERABILIDADES</div>
+                    <div class="chart-container">
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Timeline -->
+                <div class="card" style="grid-row: span 2;">
+                    <div class="card-header" style="color: var(--accent-orange);">INCIDENTE RECIENTE DETECTADO</div>
+                    <div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid var(--risk-critical); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+                        <strong style="color: var(--risk-critical);">⚠️ Ataque Ransomware Mitigado</strong>
+                    </div>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">14:15 - Diagnóstico</div>
+                            <div style="font-size: 0.95rem; margin-top: 2px;">Detección de actividad sospechosa en equipo de usuario.</div>
+                        </div>
+                        <div class="timeline-item">
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">14:20 - Protección Activa</div>
+                            <div style="font-size: 0.95rem; margin-top: 2px;">Aislamiento automático del endpoint afectado.</div>
+                        </div>
+                        <div class="timeline-item" style="margin-bottom: 0;">
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">14:25 - Respaldo y Soporte</div>
+                            <div style="font-size: 0.95rem; margin-top: 2px;">Mitigación exitosa y restauración desde copia de seguridad (100 GB).</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Flujo -->
+                <div class="card">
+                    <div class="card-header">FLUJO DE SERVICIO CIBERPYME 360</div>
+                    <div class="flowchart">
+                        <div class="flow-step">Evaluar</div> <span class="flow-arrow">➔</span>
+                        <div class="flow-step">Proteger</div> <span class="flow-arrow">➔</span>
+                        <div class="flow-step">Monitorear</div> <span class="flow-arrow">➔</span>
+                        <div class="flow-step">Respaldar</div> <span class="flow-arrow active">➔</span>
+                        <div class="flow-step active" style="background-color: var(--accent-orange); color:white; border-color:var(--accent-orange);">Responder</div>
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-top: auto;">
+                        Servicio integral sin necesidad de crear un departamento<br>interno de TI.
+                    </p>
+                </div>
+
+                <!-- 360 Grid -->
+                <div class="card">
+                    <div class="card-header">PROTECCIÓN 360° PARA NEGOCIOS REALES</div>
+                    <div class="value-grid">
+                        <div class="value-box">
+                            <h4>Seguridad Perimetral</h4>
+                            <p style="color: var(--text-light); margin-bottom: 5px;"><span class="status-dot dot-green"></span> Activo</p>
+                            <p>MFA y prevención continua.</p>
+                        </div>
+                        <div class="value-box">
+                            <h4>EDR Endpoints</h4>
+                            <p style="color: var(--text-light); margin-bottom: 5px;"><span class="status-dot dot-yellow"></span> Monitoreando</p>
+                            <p>Protección y escaneo mensual.</p>
+                        </div>
+                        <div class="value-box">
+                            <h4>Seguridad Correo & Nube</h4>
+                            <p style="color: var(--text-light); margin-bottom: 5px;"><span class="status-dot dot-green"></span> Activo</p>
+                            <p>Prevención contra fraudes.</p>
+                        </div>
+                        <div class="value-box">
+                            <h4>Capacitación Phishing</h4>
+                            <p style="color: var(--text-light); margin-bottom: 5px;"><span class="status-dot dot-yellow"></span> En curso</p>
+                            <p>Formación breve y simulaciones.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================= SECCIÓN 2: VULNERABILIDADES ================= -->
+        <section id="vulnerabilidades" class="content-section">
+            <div class="card">
+                <div class="card-header">INVENTARIO DE VULNERABILIDADES Y PRIORIZACIÓN (SEMÁFORO)</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ACTIVO DIGITAL</th>
+                            <th>HALLAZGO</th>
+                            <th>IMPACTO</th>
+                            <th>NIVEL DE RIESGO</th>
+                            <th>ACCIÓN CIBERPYME</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Correos Corporativos</td>
+                            <td>Falta Autenticación Multifactor (MFA)</td>
+                            <td>Alto</td>
+                            <td><span class="badge badge-critical">CRÍTICO</span></td>
+                            <td>Implementación inmediata según plan.</td>
+                        </tr>
+                        <tr>
+                            <td>Sistemas Contables</td>
+                            <td>Copias de seguridad desactualizadas</td>
+                            <td>Alto</td>
+                            <td><span class="badge badge-high">ALTO</span></td>
+                            <td>Configurar respaldo automatizado a la nube.</td>
+                        </tr>
+                        <tr>
+                            <td>Personal</td>
+                            <td>Tasa de engaño en Phishing: 15%</td>
+                            <td>Medio</td>
+                            <td><span class="badge badge-medium">MEDIO</span></td>
+                            <td>Asignar capacitación trimestral (10-15 min).</td>
+                        </tr>
+                        <tr>
+                            <td>Endpoints (PCs)</td>
+                            <td>Antivirus tradicional (sin EDR)</td>
+                            <td>Bajo</td>
+                            <td><span class="badge badge-low">BAJO</span></td>
+                            <td>Monitoreo continuo, mejora opcional.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ================= SECCIÓN 3: INCIDENTES ================= -->
+        <section id="incidentes" class="content-section">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-title">SLA Primera Respuesta</div>
+                    <div class="metric-value" style="color: var(--accent-blue);">≤ 4 hrs</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">Cumplimiento actual: 98%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">Reducción de Incidentes</div>
+                    <div class="metric-value" style="color: var(--risk-low);">-34%</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">Meta Año 1: ≥ 30%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">Tickets Activos</div>
+                    <div class="metric-value" style="color: var(--accent-orange);">2</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">Prioridad Baja</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">REGISTRO DE TICKETS (MESA DE AYUDA)</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>EMPRESA CLIENTE</th>
+                            <th>DESCRIPCIÓN</th>
+                            <th>ESTADO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="color: var(--text-muted);">#1024</td>
+                            <td>Consultorio Odontológico</td>
+                            <td>Fallo sincronización nube</td>
+                            <td><span class="badge badge-medium">En Progreso</span></td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">#1023</td>
+                            <td>Comercializadora XYZ</td>
+                            <td>Revisión correo sospechoso</td>
+                            <td><span class="badge badge-critical">Abierto</span></td>
+                        </tr>
+                        <tr>
+                            <td style="color: var(--text-muted);">#1022</td>
+                            <td>Firma Abogados SAS</td>
+                            <td>Restauración de archivo borrado</td>
+                            <td><span class="badge badge-low">Resuelto</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ================= SECCIÓN 4: MAPA DE RIESGOS ================= -->
+        <section id="mapa" class="content-section">
+            <div class="card">
+                <div class="card-header">SUBGRUPOS PRIORITARIOS - MIPYMES DE BOGOTÁ</div>
+                <p style="color: var(--text-muted); font-size: 0.95rem;">Foco geográfico actual: Bogotá y municipios cercanos. Escalable nacionalmente.</p>
+                
+                <div class="map-grid">
+                    <div class="border-card" style="border-left-color: var(--accent-blue);">
+                        <h4>Servicios Profesionales</h4>
+                        <p>Manejan información confidencial. Dependen del correo y la nube.</p>
+                    </div>
+                    <div class="border-card" style="border-left-color: var(--accent-orange);">
+                        <h4>Comercios (Pagos Digitales)</h4>
+                        <p>Requieren continuidad de negocio y protección en puntos de facturación.</p>
+                    </div>
+                    <div class="border-card" style="border-left-color: var(--risk-low);">
+                        <h4>Salud (Consultorios)</h4>
+                        <p>Administran datos clínicos sensibles. Alta necesidad de privacidad.</p>
+                    </div>
+                </div>
+                <div class="map-grid-bottom">
+                    <div class="border-card" style="border-left-color: var(--risk-critical);">
+                        <h4>Trabajo Híbrido</h4>
+                        <p>Equipos portátiles expuestos fuera de la oficina central.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECCIÓN 5: INFORMES ================= -->
+        <section id="informes" class="content-section">
+            <div class="card">
+                <div class="card-header">EVIDENCIA MENSUAL PARA EL GERENTE</div>
+                <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1rem;">Reporte diseñado sin tecnicismos para respaldar la toma de decisiones.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>MÉTRICA DE VALOR</th>
+                            <th>RESULTADO DEL MES</th>
+                            <th>IMPACTO SOSTENIBLE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Personal Capacitado</td>
+                            <td>+ 45 empleados</td>
+                            <td><strong style="color: var(--text-light);">Social:</strong> Mejora en hábitos digitales y reducción de errores.</td>
+                        </tr>
+                        <tr>
+                            <td>Interrupciones Evitadas</td>
+                            <td>2 horas de downtime ahorradas</td>
+                            <td><strong style="color: var(--text-light);">Económica:</strong> Continuidad operativa garantizada.</td>
+                        </tr>
+                        <tr>
+                            <td>Soporte Remoto</td>
+                            <td>12 incidentes resueltos online</td>
+                            <td><strong style="color: var(--text-light);">Ambiental:</strong> Cero desplazamientos, menos huella de carbono.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ================= SECCIÓN 6: CONFIGURACIÓN ================= -->
+        <section id="configuracion" class="content-section">
+            <div class="pricing-header">
+                <h2>SUSCRIPCIONES MODULARES (MODELO DE NEGOCIO SAAS)</h2>
+                <p>Planes escalables para crecer sin cambiar de proveedor.</p>
+            </div>
+            
+            <div class="pricing-grid">
+                <!-- Esencial -->
+                <div class="plan-card">
+                    <div class="plan-title">Plan Esencial</div>
+                    <div class="plan-price">$199.000<span>/mes</span></div>
+                    <ul class="plan-features">
+                        <li>Para 1 a 5 usuarios</li>
+                        <li>Diagnóstico y MFA</li>
+                        <li>Protección Endpoint</li>
+                        <li>Respaldo Verificado (100 GB)</li>
+                        <li>Formación Trimestral</li>
+                    </ul>
+                    <button class="btn btn-outline">Seleccionar</button>
+                </div>
+                
+                <!-- Crecimiento -->
+                <div class="plan-card popular">
+                    <div class="plan-badge">Más Elegido</div>
+                    <div class="plan-title">Plan Crecimiento</div>
+                    <div class="plan-price">$449.000<span>/mes</span></div>
+                    <ul class="plan-features">
+                        <li>Para 6 a 15 usuarios</li>
+                        <li>Respaldo 500 GB</li>
+                        <li>Escaneo Mensual</li>
+                        <li>Capacitación Bimestral</li>
+                        <li>SLA de 24 horas</li>
+                    </ul>
+                    <button class="btn btn-primary">Seleccionar</button>
+                </div>
+
+                <!-- Pro -->
+                <div class="plan-card">
+                    <div class="plan-title">Plan Pro</div>
+                    <div class="plan-price">$899.000<span>/mes</span></div>
+                    <ul class="plan-features">
+                        <li>Para 16 a 30 usuarios</li>
+                        <li>Respaldo 1 TB</li>
+                        <li>Monitoreo Ampliado</li>
+                        <li>Simulación de Phishing</li>
+                        <li>SLA de 8 horas</li>
+                    </ul>
+                    <button class="btn btn-outline">Seleccionar</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- SCRIPTS -->
+    <script>
+        // 1. Manejo de Pestañas y Títulos
+        function switchTab(sectionId, element) {
+            document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            
+            document.getElementById(sectionId).classList.add('active');
+            element.classList.add('active');
+
+            const titulos = {
+                'dashboard': 'Panel de Control <span>| ACA 1 Idea de Negocio</span>',
+                'vulnerabilidades': 'Gestión de Riesgos <span>| Semáforo CiberPyme</span>',
+                'incidentes': 'Centro de Operaciones <span>| SLAs y Soporte</span>',
+                'mapa': 'Segmentación Geográfica <span>| Mipymes Bogotá</span>',
+                'informes': 'Reporte de Sostenibilidad <span>| Valor Demostrable</span>',
+                'configuracion': 'Modelo de Negocio <span>| Planes y Precios</span>'
+            };
+            document.getElementById('page-title').innerHTML = titulos[sectionId];
+            
+            // Reiniciar animaciones de gráficos si volvemos al dashboard
+            if(sectionId === 'dashboard') {
+                gaugeChartInstance.update();
+                barChartInstance.update();
+            }
+        }
+
+        // 2. Gráficos (Chart.js)
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = "'Segoe UI', sans-serif";
+
+        // Gauge Chart
+        const ctxGauge = document.getElementById('gaugeChart').getContext('2d');
+        const gaugeChartInstance = new Chart(ctxGauge, {
+            type: 'doughnut',
+            data: {
+                labels: ['Nivel de Riesgo', 'Seguridad'],
+                datasets: [{
+                    data: [78, 22],
+                    backgroundColor: ['#f97316', '#334155'], 
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                rotation: -90,
+                circumference: 180,
+                cutout: '82%',
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 1500, easing: 'easeOutQuart' },
+                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+            }
+        });
+
+        // Bar Chart
+        const ctxBar = document.getElementById('barChart').getContext('2d');
+        const barChartInstance = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: ['Crítica', 'Alta', 'Media', 'Baja'],
+                datasets: [{
+                    data: [5, 51, 19, 4],
+                    backgroundColor: ['#ef4444', '#f97316', '#eab308', '#3b82f6'],
+                    borderRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 1500, easing: 'easeOutBounce' },
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, max: 60, grid: { color: '#334155', drawBorder: false }, ticks: { stepSize: 10 } },
+                    x: { grid: { display: false, drawBorder: true, borderColor: '#334155' } }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
